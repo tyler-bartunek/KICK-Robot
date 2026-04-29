@@ -61,12 +61,11 @@ code for the picos/modules. Module code was developed using the Raspberry Pi Pic
 
 ROS code for the Raspberry Pi was developed using the ros:jazzy-core docker image, and is available on a [separate repository](https://github.com/tyler-bartunek/kick_pi) for direct download on your raspberry pi once finished. Raspberry 3b+ or better strongly encouraged, as the project was developed on a 3b+. 
 
-### Philosophy, Parent Classes
+### Philosophy, Parent Classes: Validation Ongoing, wiki articles available upon completion
 While this is explained in greater detail in the [wiki](https://www.github.com/tyler-bartunek/KICK-Robot/wiki), provided here is a brief overview
 for integration purposes. Overall, the goal is for users to be able to extend this framework to arbitrary module configurations. 
 
 #### Configuration Class (ROS)
-**Validation ongoing, wiki article will be available upon completion.**
 Within this project's underlay (not to be confused with the ROS underlay), there is a kickbot_node package. This package has a nested package within it
 called "configuration_files". The Configuration class is defined within this subpackage, and all kinematic calculations are predicated on the geometry_msgs.msg.Twist message type, with these velocities defined relative to the center of mass, presumed or actual. 
 
@@ -76,12 +75,12 @@ def fetch_commands(self, vel_cmd: Twist, feedback) -> list:
 
 def compute_received(self, device_data) -> Twist:
 
-There is a possibility that you will need to modify it directly within the kickbot_node package and rebuild it using colcon build --packages-select to achieve desired behavior, but efforts will be made to allow you to develop your own configuration definitions in an overlay.
+_There is a possibility that you will need to modify it directly within the kickbot_node package and rebuild it using colcon build --packages-select to achieve desired behavior, but efforts will be made to allow you to develop your own configuration definitions in an overlay._
 
 #### Module Class (Pico)
 The microcontroller code for the picos is organized in the following folder structure:
 
-1. kick_pico: project root, make/build from here
+1. kick_pico: **project root, make/build from here**
    a. modules: Contains the Module parent class and any subclass definition cpp and h files
    b. utils: Additional cpp and header files for achieving any functionality the modules require, such as SPI communication or quadrature encoder reading
    c. main.cpp: driver script
