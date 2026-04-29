@@ -66,8 +66,8 @@ While this is explained in greater detail in the [wiki](https://www.github.com/t
 for integration purposes. Overall, the goal is for users to be able to extend this framework to arbitrary module configurations. 
 
 #### Configuration Class (ROS)
-Within this project's underlay (not to be confused with the ROS underlay), there is a kickbot_node package. This package has a nested package within it
-called "configuration_files". The Configuration class is defined within this subpackage, and all kinematic calculations are predicated on the geometry_msgs.msg.Twist message type, with these velocities defined relative to the center of mass, presumed or actual. 
+Within this project's underlay (not to be confused with the ROS underlay), there is a kickbrain package. This package has a nested package within it
+called "configuration_files". The Configuration class is defined within this subpackage, and all kinematic calculations are predicated on the geometry_msgs.msg.Twist message type coming from the motion planner, with these velocities defined relative to the center of mass, presumed or actual. 
 
 **All user-defined configurations must inherit from the Configuration parent class and have both a fetch_commands and compute_received method defined as following signatures:** 
 
