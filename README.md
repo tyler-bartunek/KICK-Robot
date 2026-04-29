@@ -54,9 +54,45 @@ to those modules will be added. This system was prototyped using an Ender 3 V2 a
 PLA+, with dimensions set to reflect typical tolerances for that printer with the intent of clearance fits with minimal play between 
 mounting rails and modules.
 
+## Software
+Files for characterizing your specific motors and verifying basic hardware connections to the Pi, such as the ADC for 
+battery level monitoring and custom SPI fanout board PCB, are provided within this repository, as well as the base
+code for the picos/modules. Module code was developed using the Raspberry Pi Pico C++ SDK and uses CMake (C++17).
+
+ROS code for the Raspberry Pi was developed using the ros:jazzy-core docker image, and is available on a [separate repository](https://github.com/tyler-bartunek/kick_pi) for direct download on your raspberry pi once finished. Raspberry 3b+ or better strongly encouraged, as the project was developed on a 3b+. 
+
+### Philosophy, Parent Classes
+While this is explained in greater detail in the [wiki](https://www.github.com/tyler-bartunek/KICK-Robot/wiki), provided here is a brief overview
+for integration purposes. Overall, the goal is for users to be able to extend this framework to arbitrary module configurations. 
+
+#### Configuration Class (ROS)
+**Validation ongoing, wiki article will be available upon completion.**
+Within this project's underlay (not to be confused with the ROS underlay), there is a kickbot_node package. This package has a nested package within it
+called "configuration_files". The Configuration class is defined within this subpackage, and all kinematic calculations are predicated on the geometry_msgs.msg.Twist message type, with these velocities defined relative to the center of mass, presumed or actual. 
+
+**All user-defined configurations must inherit from the Configuration parent class and have both a fetch_commands and compute_received method defined as following signatures:** 
+
+def fetch_commands(self, vel_cmd: Twist, feedback) -> list:
+
+def compute_received(self, device_data) -> Twist:
+
+There is a possibility that you will need to modify it directly within the kickbot_node package and rebuild it using colcon build --packages-select to achieve desired behavior, but efforts will be made to allow you to develop your own configuration definitions in an overlay.
+
+#### Module Class (Pico)
+The microcontroller code for the picos is organized in the following folder structure:
+
+1. kick_pico: project root, make/build from here
+   a. modules: Contains the Module parent class and any subclass definition cpp and h files
+   b. utils: Additional cpp and header files for achieving any functionality the modules require, such as SPI communication or quadrature encoder reading
+   c. main.cpp: driver script
+
+**When you define your own module definitions they must inherit from the Module base class, have a unique uint8_t ID defined, and contain a run() method override.** A sync_callback() method override is optional, but recommended if the modules need to act in a coordinated fashion (as most do). Wiki article coming soon.  
+
+**You must also modify main.cpp to instantiate your custom class.**
+
 ## Future development
-This project is still under development, and additional details such as component IDs, synchronization, and timing
-requirements will be made available as they are validated 
+This project is still under development, and additional details such as synchronization and timing
+requirements will be made available as they are validated. Current work is focused on validating the ROS setup and communication with the modules. 
 
 ## FAQ
 
