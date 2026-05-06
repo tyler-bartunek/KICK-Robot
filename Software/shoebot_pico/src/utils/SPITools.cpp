@@ -8,6 +8,7 @@ Flesh out the methods that belong to the SPI_Bus object
 
 //#define and #include
 #include "SPITools.h"
+#include <iostream> // For debugging purposes, can be removed later
 
 
 //Constructor: 
@@ -42,23 +43,34 @@ int SPI_Bus::init(){
 
 
 void SPI_Bus::transfer(const uint8_t* data, uint8_t* rx, size_t BUF_LEN){
-    //TODO: Edit this method to send out the data vector
     //Receives and returns data to the controller over the SPI bus
 
     //std::cout statements are artifact of debugging.
     // std::cout << "Waiting for valid transfer" << std::endl;
 
-    if (spi_is_readable(spi0)){
-        // std::cout << "I think there's something to read" << std::endl;
-        spi_write_read_blocking(spi0, data, rx, BUF_LEN);
-        // std::cout << "I read something";
-    }
-    else{
-        //If it failed, return a 0-valued array.
-        // std::cout << "Unable to find anything, trying again" << std::endl;
-        for (uint8_t i = 0; i < BUF_LEN; i++){
-            rx[i] = 0;
+    // if (spi_is_readable(spi0)){
+        uint8_t sync = 0;
+        while(sync != 0xBF){
+            //Send 0xBF until we get a response of 0xBF, which indicates that the controller is ready to send data.
+            spi_write_read_blocking(spi0, &data[0], &sync, 1);
         }
-    }
+        rx[0] = 0xBF;
+
+        for(int i = 1; i < BUF_LEN; i++){
+            spi_write_read_blocking(spi0, &data[i], &rx[i], 1);
+        }
+    // }
+    // else{
+    //     //If it failed, return a 0-valued array.
+    //     // std::cout << "Unable to find anything, trying again" << std::endl;
+    //     for (uint8_t i = 0; i < BUF_LEN; i++){
+    //         rx[i] = 0;
+    //     }
+    // }
+
+    //Debugging: Add back in if unsure what we're receiving
+    // for (uint8_t i = 0; i < BUF_LEN; i++){
+    //     std::cout << "\tByte " << int(i) << ": " << std::hex << int(rx[i]) << std::endl;
+    // }
 
 }

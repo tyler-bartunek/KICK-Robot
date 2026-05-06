@@ -15,15 +15,16 @@ Module options:
 #include "EchoDevice.h"
 // #include "Wheels.h"
 
+#define MODULE_TYPE EchoDevice
+
 
 /****************************Main Function  *******************************/
 int main(void){
     // Uncomment for debugging, and #include <iostream> in relevant class definition header file
-    // stdio_init_all();  // initializes USB or UART stdout depending on config, for debug purposes
-    // sleep_ms(3000);
+    stdio_init_all();  // initializes USB or UART stdout depending on config, for debug purposes
+    sleep_ms(3000);
 
-    EchoDevice pico_device = EchoDevice();
-    //Wheels pico_device = Wheels();
+    MODULE_TYPE pico_device = MODULE_TYPE();
 
     //Once connected, continuously read the SPI input buffer and write to the transmit buffer
     while(true){

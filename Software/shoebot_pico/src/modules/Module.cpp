@@ -8,9 +8,21 @@ Test that we can receive and then send values over the SPI bus on the raspberry 
 
 //#define and #include
 #include "Module.h"
+#include<iostream> // For debugging purposes, can be removed later
 
 
 /****************************Main Function  *******************************/
+
+//Static wrapper function definitions
+static bool blink_callback(struct repeating_timer *t) {
+    // Cast the user data back to a Module pointer
+    Module* module = static_cast<Module*>(t->user_data);
+    // Call the member function to handle blinking
+    module->ErrorMessage(); // Run the error message handler, which will determine the appropriate blinking pattern based on the current error code
+    return true; // Return true to keep the timer repeating
+}
+
+
 
 
 Module::Module(const uint8_t identifier){
@@ -25,6 +37,10 @@ Module::Module(const uint8_t identifier){
     //Initialize the LED to blink
     gpio_init(PICO_DEFAULT_LED_PIN);
     gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
+
+    //Set up the repeating timer for blinking error codes, with the static wrapper function as the callback and passing 'this' as user data
+    //fire every 50 ms, which is the smallest delay we will use between blinks, so that we can maintain accurate timing even when we have to do a lot of blinks.
+    add_repeating_timer_ms(50, blink_callback, this, &blink_timer);
 
     //Initialize SYNC pin
     gpio_init(SYNC);
@@ -55,13 +71,26 @@ short Module::Transfer(short data){
             //Enforce transmission rules, sync message has 0-valued data
             this->FrameMessage(0, sync_message);
 
+            // std::cout << "Sent: " << std::endl;
+            // std::cout << "\tPath header: " << int(sync_message[0]) << std::endl;
+            // std::cout << "\tMask: " << int(sync_message[1]) << std::endl;
+            // std::cout << "\tChecksum: " << int(sync_message[4]) << std::endl;
+
             //Send out the sync message
             this->spi.transfer(sync_message, handshake_attempt, MSG_LEN);
+
+            // std::cout << "Received: " << std::endl;
+            // std::cout << "\tEOF: " << std::hex << int(handshake_attempt[0]) << std::endl;
+            // std::cout << "\tPath header: " << std::hex << int(handshake_attempt[1]) << std::endl;
+            // std::cout << "\tMask: " << std::hex << int(handshake_attempt[2]) << std::endl;
+            // std::cout << "\tData B1: " << std::hex << int(handshake_attempt[3]) << std::endl;
+            // std::cout << "\tData B2: " << std::hex << int(handshake_attempt[4]) << std::endl;
+            // std::cout << "\tChecksum: " << std::hex << int(handshake_attempt[5]) << std::endl;
 
             if (this->IsConnectionEstablished(handshake_attempt)){
                 PATH_ID = handshake_attempt[1] & 0x7;
                 status = TRANSMITTING;
-                return this->ParseMessage(handshake_attempt);
+                return 0; //Known value sent by host on successful handshake, can be used to trigger state changes in the module's run() method if desired
             }
             else{
                 //Send to DISCONNECTED so we have a path to re-try.
@@ -121,10 +150,11 @@ short Module::Transfer(short data){
 //Frame the outgoing message
 void Module::FrameMessage(short data, uint8_t* message){
 
-    if (this-> status == TRANSMITTING){
-        //Construct the header, push the mask to host
-        message[0] = 0xF0 | (PATH_ID & 0x7);
-        message[1] = MASK;
+    //Construct the header, push the mask to host
+    message[0] = 0xF0 | (PATH_ID & 0x7);
+    message[1] = MASK;
+
+    if ((this-> status == TRANSMITTING) || (this->status == DISCOVERY)){
 
         // Use bitwise operations to break the 'short' into two bytes
         // Higher byte: Shift right by 8 bits and mask lowest 8 bits (optional mask but clear)
@@ -158,7 +188,7 @@ short Module::ParseMessage(const uint8_t* message){
     bool correct_path_id = (message[1] & 0x7) == PATH_ID;
     bool correct_mask = message[2] == MASK;
     uint8_t data_payload[MSG_LEN-2]= {message[1], message[2], message[3], message[4]};
-    bool correct_checksum_value = this->ValidChecksum(data_payload, message[5], MSG_LEN);
+    bool correct_checksum_value = this->ValidChecksum(data_payload, message[5], MSG_LEN - 2);
 
     if (correct_path_id && correct_checksum_value && correct_mask){
         status = TRANSMITTING;

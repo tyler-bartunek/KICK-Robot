@@ -37,6 +37,9 @@ class Module{
         bool in_burst;
         uint8_t blinks_done;
 
+        //Blinking timer
+        struct repeating_timer blink_timer;
+
     public:
 
         explicit Module(const uint8_t identifier);
@@ -44,6 +47,8 @@ class Module{
         //Define within inherited classes to obtain desired behavior
         virtual void run() = 0;
         virtual void sync_callback() {}
+
+        void ErrorMessage();
         
         virtual ~Module() = default;
 
@@ -63,8 +68,6 @@ class Module{
         uint8_t Checksum(const uint8_t* payload, size_t payload_len);
 
         bool ValidChecksum(const uint8_t* payload, uint8_t sent_result, size_t payload_len);
-
-        void ErrorMessage();
 
         void Blink(const uint8_t num_blinks, const uint64_t delay_between_blinks);
 
