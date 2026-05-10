@@ -56,7 +56,7 @@ void SPI_Bus::transfer(const uint8_t* data, uint8_t* rx, size_t BUF_LEN){
         }
         rx[0] = 0xBF;
 
-        for(int i = 1; i < BUF_LEN; i++){
+        for(size_t i = 1; i < BUF_LEN; i++){
             spi_write_read_blocking(spi0, &data[i], &rx[i], 1);
         }
     // }
@@ -68,8 +68,8 @@ void SPI_Bus::transfer(const uint8_t* data, uint8_t* rx, size_t BUF_LEN){
     //     }
     // }
 
-    //Debugging: Add back in if unsure what we're receiving
-    // for (uint8_t i = 0; i < BUF_LEN; i++){
+    // Debugging: Add back in if unsure what we're receiving
+    // for (size_t i = 0; i < BUF_LEN; i++){
     //     std::cout << "\tByte " << int(i) << ": " << std::hex << int(rx[i]) << std::endl;
     // }
 

@@ -71,21 +71,8 @@ short Module::Transfer(short data){
             //Enforce transmission rules, sync message has 0-valued data
             this->FrameMessage(0, sync_message);
 
-            // std::cout << "Sent: " << std::endl;
-            // std::cout << "\tPath header: " << int(sync_message[0]) << std::endl;
-            // std::cout << "\tMask: " << int(sync_message[1]) << std::endl;
-            // std::cout << "\tChecksum: " << int(sync_message[4]) << std::endl;
-
             //Send out the sync message
             this->spi.transfer(sync_message, handshake_attempt, MSG_LEN);
-
-            // std::cout << "Received: " << std::endl;
-            // std::cout << "\tEOF: " << std::hex << int(handshake_attempt[0]) << std::endl;
-            // std::cout << "\tPath header: " << std::hex << int(handshake_attempt[1]) << std::endl;
-            // std::cout << "\tMask: " << std::hex << int(handshake_attempt[2]) << std::endl;
-            // std::cout << "\tData B1: " << std::hex << int(handshake_attempt[3]) << std::endl;
-            // std::cout << "\tData B2: " << std::hex << int(handshake_attempt[4]) << std::endl;
-            // std::cout << "\tChecksum: " << std::hex << int(handshake_attempt[5]) << std::endl;
 
             if (this->IsConnectionEstablished(handshake_attempt)){
                 PATH_ID = handshake_attempt[1] & 0x7;
@@ -195,7 +182,8 @@ short Module::ParseMessage(const uint8_t* message){
         error_code = ALL_CLEAR;
         prev_status = TRANSMITTING;
         missed_packets = 0;
-        return (short(message[2]) << 8) | message[3];
+        short value = (short(message[3]) << 8) | message[4];
+        return value;
     }
     else{
         status = SUSPECT;
