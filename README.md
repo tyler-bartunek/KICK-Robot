@@ -45,6 +45,17 @@ out, a homebrew guide will be produced and added to the wiki.
 2. Shoeshine: Offers quadrupedal motion through use of servomotors (Pending Initial Design)
 3. HexaBox: Requires six mounts, offers six-legged locomotion through use of servomotors. (Pending Initial Design)
 
+Note that each module type gets its own uint8_t identifier. Here are some urrently used ID's within KICK framework:
+
+| ID | Module Type |
+|----|-------------|
+|0x00 | **Reserved**: No Connection |
+|0x01 | Echo test functionality |
+|0x02 | Mecanum Wheel Version A |
+|0x03 | Mecanum Wheel Version B |
+|0x04 | Quadruped Leg Version A |
+|0x05 | Quadruped Leg Version B |
+
 ## Hardware
 
 ### Printed Components and Module Fit
@@ -74,27 +85,68 @@ called "configuration_files". The Configuration class is defined within this sub
 def fetch_commands(self, vel_cmd: Twist, feedback) -> list:
 ```
 
-```
+This method takes the center of mass velocity command from the motion planning node, which uses the built-in geometry\_msgs.Twist topic message type and any feedback to compute new actuator commands. 
+
+``` 
 def compute_received(self, device_data) -> Twist:
 ```
+This method takes the data received from the bus\_hub node and computes the forward kinematics for your configuration to build feedback. 
+
+Once you have your configuration kinematics defined, you go to the \_\_init\_\_.py file within the configuration\_files directory and add the frozenset of module ids that can be used to recognize your configuration. Note that it does use a frozenset, so if you need X number of modules for a successful deployment, be sure to add that check to your custom configuration's class definition.
+
+__**Note that 0x00 is reserved as the "no connection" module ID, so your frozenset will need to include it if any connection points on the harness are disconnected**__
 
 _There is a possibility that you will need to modify it directly within the kickbot_node package and rebuild it using colcon build --packages-select to achieve desired behavior, but efforts will be made to allow you to develop your own configuration definitions in an overlay._
 
 #### Module Class (Pico)
 The microcontroller code for the picos is organized in the following folder structure:
 
-1. kick_pico: **project root, make/build from here**
-   a. modules: Contains the Module parent class and any subclass definition cpp and h files
-   b. utils: Additional cpp and header files for achieving any functionality the modules require, such as SPI communication or quadrature encoder reading
-   c. main.cpp: driver script
+1. kick_pico: **project root, make/build from here** <br>
+   a. modules: Contains the Module parent class and any subclass definition cpp and h files <br>
+   b. utils: Additional cpp and header files for achieving any functionality the modules require, such as SPI communication or quadrature encoder reading <br>
+   c. main.cpp: driver script, creates the `pico_device` instance and calls its `run()` method repeatedly <br>
+
+You define your custom module by adding a header and cpp file within the modules subdirectory, and be sure to add the relevant files to the CMakeLists.txt file within that subdirectory. The custom module class that you define **must** inherit from the Module base class, and must include a run method override that defines your module's behavior in response to received data from the Pi. That run method **must** call `this -> Transfer(data)`, where `data` is a short (uint16\_t) being sent back to the pi. 
+
+Minimally viable example of a custom subclass header file:
+```
+#pragma once
+
+#include "Module.h"
+
+class MinimalExample : public Module {
+    
+    public:
+        
+        MinimalExample();
+
+        void run() override;
+
+        ~MinimalExample() = default;
+};
+```
+
+If your module requires additional custom header files to function, these go under the utils subdirectory and you will in turn need to modify that CMakeLists.txt file.
+
+For example, if you need to add something for the module to read an encoder that you've either written or cloned a library for named MyReallyCoolEncLib, you would modify the very first line of CMakeLists.txt file in utils to read:
+
+```
+add_library(utils STATIC SPITools.cpp MyReallyCoolEncLib.cpp)
+```
+
+assuming that your library has a cpp file defined for it.
+
+Lastly, you modify line 18 of main.cpp to have the name of your new module type
+
+```
+#define MODULE_TYPE MinimalExample
+```
 
 **When you define your own module definitions they must inherit from the Module base class, have a unique uint8_t ID defined, and contain a run() method override.** A sync_callback() method override is optional, but recommended if the modules need to act in a coordinated fashion (as most do). Wiki article coming soon.  
 
-**You must also modify main.cpp to instantiate your custom class.**
-
 ## Future development
 This project is still under development, and additional details such as synchronization and timing
-requirements will be made available as they are validated. Current work is focused on validating the ROS setup and communication with the modules. 
+requirements will be made available as they are validated. Current work is focused on validating the ROS setup and getting the Wheels Module ready to ``roll". 
 
 ## FAQ
 
