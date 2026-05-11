@@ -70,10 +70,13 @@ Within this project's underlay (not to be confused with the ROS underlay), there
 called "configuration_files". The Configuration class is defined within this subpackage, and all kinematic calculations are predicated on the geometry_msgs.msg.Twist message type coming from the motion planner, with these velocities defined relative to the center of mass, presumed or actual. 
 
 **All user-defined configurations must inherit from the Configuration parent class and have both a fetch_commands and compute_received method defined as following signatures:** 
-
+```
 def fetch_commands(self, vel_cmd: Twist, feedback) -> list:
+```
 
+```
 def compute_received(self, device_data) -> Twist:
+```
 
 _There is a possibility that you will need to modify it directly within the kickbot_node package and rebuild it using colcon build --packages-select to achieve desired behavior, but efforts will be made to allow you to develop your own configuration definitions in an overlay._
 
