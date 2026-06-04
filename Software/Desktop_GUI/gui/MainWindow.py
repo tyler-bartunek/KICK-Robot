@@ -89,7 +89,6 @@ class MainWindow(QMainWindow):
         center_layout.setSpacing(0)
         center_layout.addWidget(QLabel("[ Tab Bar ]"))
         center_layout.addWidget(QLabel("[ Rail Canvas ]"), stretch=1)
-        center_layout.addWidget(QLabel("[ PID Strip ]"))
 
         # Right sidebar: module library + detected devices
         right_container = QWidget()
