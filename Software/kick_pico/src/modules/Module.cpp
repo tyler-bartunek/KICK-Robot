@@ -57,7 +57,7 @@ Module::Module(const uint8_t identifier){
 }
 
 //Handle SPI transaction
-short Module::Transfer(short data){
+int Module::Transfer(int data){
 
     switch(status){
 
@@ -91,6 +91,7 @@ short Module::Transfer(short data){
 
         case TRANSMITTING:
             {
+
             //Get the outgoing message ready to send
             uint8_t sending[MSG_LEN] = {};
             this->FrameMessage(data, sending);
@@ -99,9 +100,8 @@ short Module::Transfer(short data){
 
             //Perform the SPI transfer
             this->spi.transfer(sending, receiving, MSG_LEN);
-            
             //Parse the message
-            short received = this->ParseMessage(receiving);
+            int received = this->ParseMessage(receiving);
 
             return received;
             }
@@ -135,7 +135,7 @@ short Module::Transfer(short data){
 
 
 //Frame the outgoing message
-void Module::FrameMessage(short data, uint8_t* message){
+void Module::FrameMessage(int data, uint8_t* message){
 
     //Construct the header, push the mask to host
     message[0] = 0xF0 | (PATH_ID & 0x7);
@@ -143,46 +143,46 @@ void Module::FrameMessage(short data, uint8_t* message){
 
     if ((this-> status == TRANSMITTING) || (this->status == DISCOVERY)){
 
-        // Use bitwise operations to break the 'short' into two bytes
+        // Use bitwise operations to break the 'int' into 4 bytes
         // Higher byte: Shift right by 8 bits and mask lowest 8 bits (optional mask but clear)
-        uint8_t high_byte = (data >> 8) & 0xFF;
-        // Lower byte: Mask just the lowest 8 bits
-        uint8_t low_byte = data & 0xFF;
-
-        // Add the high and low bytes of data to the vector
-        message[2] = high_byte;
-        message[3] = low_byte;
+        for (uint8_t byte_idx = 0; byte_idx < WORD_LEN; byte_idx++){
+            message[2 + byte_idx] = (data >> (8 * (WORD_LEN - 1 - byte_idx))) & 0xFF;
+        }
 
         //Compute the checksum value based on first message length-2 values
         //this value because message length - (alignment + checksum)
-        message[4] = this->Checksum(message, MSG_LEN - 2);
+        message[6] = this->Checksum(message, MSG_LEN - 2);
 
-        //Append alignment byte
-        message[5] = 0xBF;
     }
     else{
         //Push out a message of zeros with 0xFF checksum
-        message[4] = 0xFF;
-        message[5] = 0xBF;
+        message[6] = 0xFF;
     }
+
+    //Append alignment byte regardless.
+    message[7] = 0xBF;
  
 }
 
 
 //Parse the incoming message
-short Module::ParseMessage(const uint8_t* message){
+int Module::ParseMessage(const uint8_t* message){
 
     bool correct_path_id = (message[1] & 0x7) == PATH_ID;
     bool correct_mask = message[2] == MASK;
-    uint8_t data_payload[MSG_LEN-2]= {message[1], message[2], message[3], message[4]};
-    bool correct_checksum_value = this->ValidChecksum(data_payload, message[5], MSG_LEN - 2);
+    uint8_t data_payload[MSG_LEN-2]= {message[1], message[2], message[3], message[4], message[5], message[6]}; //Strip the header and alignment bytes for checksum validation
+    bool correct_checksum_value = this->ValidChecksum(data_payload, message[7], MSG_LEN - 2);
 
     if (correct_path_id && correct_checksum_value && correct_mask){
         status = TRANSMITTING;
         error_code = ALL_CLEAR;
         prev_status = TRANSMITTING;
         missed_packets = 0;
-        short value = (short(message[3]) << 8) | message[4];
+        int value = 0;
+        //Reconstruct the int from the 4 bytes in the message, using bitwise operations using a for loop
+        for (uint8_t byte_idx = 0; byte_idx < WORD_LEN; byte_idx++){
+            value |= (message[3 + byte_idx] << (8 * (WORD_LEN - 1 - byte_idx)));
+        }
         return value;
     }
     else{
@@ -273,8 +273,11 @@ bool Module::IsConnectionEstablished(const uint8_t* handshake){
 
     bool eof_check = handshake[0] == 0xBF;
     //Strip the alignment and checksum bytes from checksum calc
-    uint8_t data_payload[MSG_LEN-2] = {handshake[1], handshake[2], handshake[3], handshake[4]};
-    bool checksum_valid = this -> ValidChecksum(data_payload, handshake[5], MSG_LEN-2);
+    uint8_t data_payload[MSG_LEN-2];
+    for (uint8_t byte_idx = 1; byte_idx < MSG_LEN - 1; byte_idx++){
+        data_payload[byte_idx - 1] = handshake[byte_idx];
+    }
+    bool checksum_valid = this -> ValidChecksum(data_payload, handshake[MSG_LEN - 1], MSG_LEN-2);
 
     return eof_check && checksum_valid;
 

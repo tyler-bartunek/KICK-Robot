@@ -6,7 +6,8 @@
 #include "pico/time.h"
 #include <cstdint>
 
-#define MSG_LEN 6
+#define MSG_LEN 8
+#define WORD_LEN 4
 
 class Module{
 
@@ -55,13 +56,13 @@ class Module{
     protected:
 
         //Handle SPI transaction
-        [[nodiscard]] short Transfer(short data);
+        [[nodiscard]] int Transfer(int data);
 
         //Frame the outgoing message
-        void FrameMessage(short data, uint8_t* ou);
+        void FrameMessage(int data, uint8_t* ou);
 
         //Parse the incoming message
-        [[nodiscard]] short ParseMessage(const uint8_t* message);
+        [[nodiscard]] int ParseMessage(const uint8_t* message);
 
         bool IsConnectionEstablished(const uint8_t* handshake);
 

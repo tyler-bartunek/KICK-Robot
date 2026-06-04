@@ -12,10 +12,10 @@ Module options:
 */
 
 //#define and #include:
-#include "EchoDevice.h"
-// #include "Wheels.h"
+// #include "EchoDevice.h"
+#include "Wheels.h"
 
-#define MODULE_TYPE EchoDevice
+#define MODULE_TYPE Wheels
 
 
 /****************************Main Function  *******************************/

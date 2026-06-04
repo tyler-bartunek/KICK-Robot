@@ -24,8 +24,8 @@ void EchoDevice::run(){
 void EchoDevice::Echo(){
 
     //Initialize data_to_send and data_received
-    static short data_to_send = 0;
-    short data_received = 0;
+    static int data_to_send = 0;
+    int data_received = 0;
 
     //Check if we are transmitting or if we've lost connection. If we have then we want to know about it
     data_received = this->Transfer(data_to_send);
