@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget,
     QLabel, QPushButton, QComboBox, QSizePolicy
@@ -8,9 +10,24 @@ from PyQt6.QtCore import pyqtSignal as signal
 
 from discovery.RobotDiscovery import RobotDiscoveryWorker
 
+# Local imports: Side panel, status strip, tab bar
 from gui.StatusStrip import StatusStrip
 from gui.TabBar import TabBar
+from gui.RightPanel import RightPanel
+
+# Local imports: central canvas widgets
 from gui.RailCanvas import RailCanvas
+from gui.SensorConfig import SensorConfigWidget
+from gui.SLAM_Map import SLAM_MapWidget
+
+#Local imports: bottom widgets
+from gui.FaultLog import FaultLogWidget
+from gui.OrientationWidget import OrientationWidget
+from gui.ControlWidget import ControlWidget
+from gui.LaunchPanel import LaunchPanel
+
+
+IMG_DIR = Path(__file__).parent.parent / "assets" / "img"
 
 
 class MainWindow(QMainWindow):
@@ -51,6 +68,7 @@ class MainWindow(QMainWindow):
         self.main_layout.addLayout(self.bottom_section, stretch=1)
 
     def build_title_bar(self) -> QWidget:
+        
         container = QWidget()
         container.setObjectName("TitleBar")
         container.setFixedHeight(40)
@@ -58,7 +76,11 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(14, 0, 14, 0)
         layout.setSpacing(12)
 
-        title = QLabel("KICK Robot Desktop")
+        
+        title = QLabel()
+        title.setText(
+                      f"<h1><img src='{IMG_DIR / 'KICK_shoeprint_logo.png'}' width='30' height='30'> KICK Robot Desktop </h1>"
+                      )
         title.setObjectName("TitleLabel")
         layout.addWidget(title)
         layout.addStretch()
@@ -116,8 +138,8 @@ class MainWindow(QMainWindow):
         right_layout = QVBoxLayout(right_container)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(0)
-        right_layout.addWidget(QLabel("[ Module Library ]"))
-        right_layout.addWidget(QLabel("[ Detected Devices ]"), stretch=1)
+        self.right_panel = RightPanel()
+        right_layout.addWidget(self.right_panel, stretch=1)
 
         layout.addWidget(center_container, stretch=1)
         layout.addWidget(right_container)
@@ -128,8 +150,8 @@ class MainWindow(QMainWindow):
         #Create the central stacked window, which will hold the different tab contents
         stacked_widget = QStackedWidget()
         
-        stacked_widget.addWidget(QLabel("[ Hardware Configuration ]"))
-        stacked_widget.addWidget(QLabel("[ Sensor Configuration ]"))
+        stacked_widget.addWidget(RailCanvas())
+        stacked_widget.addWidget(SensorConfigWidget())
         stacked_widget.addWidget(QLabel("[ Coming Soon: SLAM Map ]"))    
         
         return stacked_widget
@@ -144,9 +166,9 @@ class MainWindow(QMainWindow):
         bl_layout = QHBoxLayout(bottom_left)
         bl_layout.setContentsMargins(10, 8, 10, 8)
         bl_layout.setSpacing(14)
-        bl_layout.addWidget(QLabel("[ Fault Log ]"), stretch=1)
-        bl_layout.addWidget(QLabel("[ Orientation ]"), stretch=1)
-        bl_layout.addWidget(QLabel("[ Control ]"), stretch=1)
+        bl_layout.addWidget(FaultLogWidget(), stretch=1)
+        bl_layout.addWidget(OrientationWidget(), stretch=1)
+        bl_layout.addWidget(ControlWidget(), stretch=1)
 
         # Bottom right: launch profile
         bottom_right = QWidget()
@@ -154,7 +176,7 @@ class MainWindow(QMainWindow):
         bottom_right.setFixedWidth(190)
         br_layout = QVBoxLayout(bottom_right)
         br_layout.setContentsMargins(10, 8, 10, 8)
-        br_layout.addWidget(QLabel("[ Launch Profile ]"))
+        br_layout.addWidget(LaunchPanel())
 
         layout.addWidget(bottom_left, stretch=1)
         layout.addWidget(bottom_right)

@@ -118,21 +118,6 @@ class RightPanel(QWidget):
         layout.addWidget(sep)
         layout.addWidget(scroll, stretch=1)
 
-        # Seed with placeholder rows (will be replaced by live data)
-        self._seed_placeholder_devices()
-
-    def _seed_placeholder_devices(self):
-        devices = [
-            ("0x02", "0", "MW", False),
-            ("0x00", "1", "MW", True),
-            ("0x04", "2", "MW", False),
-            ("0x06", "3", "MW", False),
-        ]
-        for addr, pos, mtype, fault in devices:
-            self._device_list_layout.addWidget(
-                _DeviceItem(addr, pos, mtype, fault)
-            )
-        self._device_list_layout.addStretch()
 
     # ------------------------------------------------------------------
     # Public API — call from roslibpy bus_state callback
