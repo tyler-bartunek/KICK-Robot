@@ -1,11 +1,16 @@
 from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget,
     QLabel, QPushButton, QComboBox, QSizePolicy
 )
 from PyQt6.QtGui import QFont
 from PyQt6.QtCore import QThread, Qt
+from PyQt6.QtCore import pyqtSignal as signal
 
 from discovery.RobotDiscovery import RobotDiscoveryWorker
+
+from gui.StatusStrip import StatusStrip
+from gui.TabBar import TabBar
+from gui.RailCanvas import RailCanvas
 
 
 class MainWindow(QMainWindow):
@@ -81,14 +86,28 @@ class MainWindow(QMainWindow):
         layout = QHBoxLayout()
         layout.setSpacing(1)
 
-        # Center workspace: tabs + rail canvas + PID strip
+        # Center workspace: tabs + rail canvas
         center_container = QWidget()
         center_container.setObjectName("CenterWorkspace")
         center_layout = QVBoxLayout(center_container)
         center_layout.setContentsMargins(0, 0, 0, 0)
         center_layout.setSpacing(0)
-        center_layout.addWidget(QLabel("[ Tab Bar ]"))
-        center_layout.addWidget(QLabel("[ Rail Canvas ]"), stretch=1)
+        
+        central_canvas_layout = self.build_central_stacked_window()
+        
+        tab_bar = TabBar()
+        tab_bar.hardware_btn.clicked.connect(lambda: central_canvas_layout.setCurrentIndex(0))
+        tab_bar.sensor_btn.clicked.connect(lambda: central_canvas_layout.setCurrentIndex(1))
+        tab_bar.slam_btn.clicked.connect(lambda: central_canvas_layout.setCurrentIndex(2))
+        tab_bar.add_widgets([tab_bar.hardware_btn, tab_bar.sensor_btn, tab_bar.slam_btn])
+        tab_bar.layout.addStretch()
+  
+        center_layout.addWidget(tab_bar)
+        center_layout.addWidget(StatusStrip())
+        # center_layout.addWidget(QLabel("[ Rail Canvas ]"), stretch=1)
+        
+        #Add the main window's central canvas (stacked widget) to the center layout
+        center_layout.addWidget(central_canvas_layout, stretch=1)
 
         # Right sidebar: module library + detected devices
         right_container = QWidget()
@@ -103,6 +122,17 @@ class MainWindow(QMainWindow):
         layout.addWidget(center_container, stretch=1)
         layout.addWidget(right_container)
         return layout
+    
+    def build_central_stacked_window(self) -> QStackedWidget:
+        
+        #Create the central stacked window, which will hold the different tab contents
+        stacked_widget = QStackedWidget()
+        
+        stacked_widget.addWidget(QLabel("[ Hardware Configuration ]"))
+        stacked_widget.addWidget(QLabel("[ Sensor Configuration ]"))
+        stacked_widget.addWidget(QLabel("[ Coming Soon: SLAM Map ]"))    
+        
+        return stacked_widget
 
     def build_bottom_section(self) -> QHBoxLayout:
         layout = QHBoxLayout()
