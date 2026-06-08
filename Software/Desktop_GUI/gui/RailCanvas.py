@@ -151,11 +151,6 @@ class RailCanvas(QWidget):
         self._bracket = _DimBracket(value_mm=65)
         self._bracket.setFixedWidth(350)
 
-        # rails = QWidget()
-        # rl = QHBoxLayout(rails)
-        # rl.setContentsMargins(0, 0, 0, 0)
-        # rl.setSpacing(0)
-
         self._rail_left  = _Rail()
         self._rail_right = _Rail()
 
@@ -182,6 +177,8 @@ class RailCanvas(QWidget):
         fl.setSpacing(6)
         fl.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
 
+
+        #TODO: Make this dynamic depending on which modules are detected using _populate_sidebar
         self._wheel_r = QSpinBox()
         self._wheel_r.setRange(0, 200)
         self._wheel_r.setValue(65)
@@ -195,6 +192,10 @@ class RailCanvas(QWidget):
         fl.addRow("", push)
 
         return sidebar
+    
+    def _populate_sidebar(self) -> QWidget:
+        
+        pass
 
     def _on_push(self):
         self.config_changed.emit({

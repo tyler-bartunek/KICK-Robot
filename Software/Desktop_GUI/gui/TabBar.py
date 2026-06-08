@@ -13,7 +13,7 @@ class TabBar(QWidget):
         self.layout.setContentsMargins(12, 0, 12, 0)
         self.layout.setSpacing(6)
         
-        # Add buttons for each tab, and connect them to the click handler
+        # Add buttons for each tab
         self.hardware_btn = QPushButton("Hardware Configuration")
         self.sensor_btn = QPushButton("Sensor Configuration")
         self.slam_btn = QPushButton("SLAM Map")

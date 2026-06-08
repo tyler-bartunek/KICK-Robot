@@ -89,9 +89,10 @@ class RightPanel(QWidget):
         lib_layout.setContentsMargins(12, 10, 12, 10)
         lib_layout.setSpacing(4)
         lib_layout.addWidget(_SectionHeader("Module Library"))
-        lib_layout.addWidget(_ModuleLibraryItem("mecanum wheel", "#1D9E75"))
-        lib_layout.addWidget(_ModuleLibraryItem("servo joint",   "#378ADD"))
-        lib_layout.addWidget(_ModuleLibraryItem("toe sensor",    "#BA7517"))
+        lib_layout.addWidget(_ModuleLibraryItem("mecanum wheel L", "#1D9E75"))
+        lib_layout.addWidget(_ModuleLibraryItem("mecanum wheel R",   "#378ADD"))
+        lib_layout.addWidget(_ModuleLibraryItem("quad leg A",    "#BA7517"))
+        lib_layout.addWidget(_ModuleLibraryItem("quad leg B", "#BA173E"))
 
         sep = QFrame()
         sep.setFrameShape(QFrame.Shape.HLine)

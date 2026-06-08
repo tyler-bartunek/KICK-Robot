@@ -16,3 +16,6 @@ class SLAM_MapWidget(QWidget):
         header = QLabel("SLAM MAP")
         header.setObjectName("PanelSectionHeader")
         layout.addWidget(header)
+        
+        #TODO: Add something that will check what sensor streams are available
+        #If Ultrasonic or LIDAR unavailable, do not offer SLAM

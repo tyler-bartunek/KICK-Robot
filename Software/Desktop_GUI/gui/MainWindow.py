@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget,
     QLabel, QPushButton, QComboBox, QSizePolicy
 )
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QWindow
 from PyQt6.QtCore import QThread, Qt
 from PyQt6.QtCore import pyqtSignal as signal
 
@@ -115,21 +115,20 @@ class MainWindow(QMainWindow):
         center_layout.setContentsMargins(0, 0, 0, 0)
         center_layout.setSpacing(0)
         
-        central_canvas_layout = self.build_central_stacked_window()
+        self.central_canvas_layout = self.build_central_stacked_window()
         
         tab_bar = TabBar()
-        tab_bar.hardware_btn.clicked.connect(lambda: central_canvas_layout.setCurrentIndex(0))
-        tab_bar.sensor_btn.clicked.connect(lambda: central_canvas_layout.setCurrentIndex(1))
-        tab_bar.slam_btn.clicked.connect(lambda: central_canvas_layout.setCurrentIndex(2))
+        tab_bar.hardware_btn.clicked.connect(lambda: self.central_canvas_layout.setCurrentIndex(0))
+        tab_bar.sensor_btn.clicked.connect(lambda: self.central_canvas_layout.setCurrentIndex(1))
+        tab_bar.slam_btn.clicked.connect(lambda: self.central_canvas_layout.setCurrentIndex(2))
         tab_bar.add_widgets([tab_bar.hardware_btn, tab_bar.sensor_btn, tab_bar.slam_btn])
         tab_bar.layout.addStretch()
   
         center_layout.addWidget(tab_bar)
         center_layout.addWidget(StatusStrip())
-        # center_layout.addWidget(QLabel("[ Rail Canvas ]"), stretch=1)
         
         #Add the main window's central canvas (stacked widget) to the center layout
-        center_layout.addWidget(central_canvas_layout, stretch=1)
+        center_layout.addWidget(self.central_canvas_layout, stretch=1)
 
         # Right sidebar: module library + detected devices
         right_container = QWidget()
@@ -150,9 +149,13 @@ class MainWindow(QMainWindow):
         #Create the central stacked window, which will hold the different tab contents
         stacked_widget = QStackedWidget()
         
-        stacked_widget.addWidget(RailCanvas())
-        stacked_widget.addWidget(SensorConfigWidget())
-        stacked_widget.addWidget(QLabel("[ Coming Soon: SLAM Map ]"))    
+        self.rail_canvas = RailCanvas()
+        self.sensor_canvas = SensorConfigWidget()
+        self.slam_canvas = SLAM_MapWidget
+        
+        stacked_widget.addWidget(self.rail_canvas)
+        stacked_widget.addWidget(self.sensor_canvas)
+        stacked_widget.addWidget(self.slam_canvas)    
         
         return stacked_widget
 
@@ -317,3 +320,20 @@ class MainWindow(QMainWindow):
                 border-left: 1px solid #2a2a2a;
             }
         """)
+
+
+#Child Windows(?)
+#Pop-up for configuring the given sensor
+class SensorConfigWindow(QWindow):
+    
+    def __init__(self, parent=MainWindow):
+        
+        super().__init__()
+        
+
+#Pop-up for configuring a given module
+class ModuleConfigWindow(QWindow):
+    
+    def __init__(self, parent=MainWindow):
+        
+        super().__init__()
