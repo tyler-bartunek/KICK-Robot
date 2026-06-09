@@ -1,5 +1,7 @@
+#Load relative paths, be able to open and parse XML files
 from pathlib import Path
 
+#PyQt Functionality
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget,
     QLabel, QPushButton, QComboBox, QSizePolicy
@@ -8,6 +10,7 @@ from PyQt6.QtGui import QFont, QWindow
 from PyQt6.QtCore import QThread, Qt
 from PyQt6.QtCore import pyqtSignal as signal
 
+# Local imports: Discovery tool that uses zeroconf
 from discovery.RobotDiscovery import RobotDiscoveryWorker
 
 # Local imports: Side panel, status strip, tab bar
@@ -151,7 +154,7 @@ class MainWindow(QMainWindow):
         
         self.rail_canvas = RailCanvas()
         self.sensor_canvas = SensorConfigWidget()
-        self.slam_canvas = SLAM_MapWidget
+        self.slam_canvas = SLAM_MapWidget()
         
         stacked_widget.addWidget(self.rail_canvas)
         stacked_widget.addWidget(self.sensor_canvas)
@@ -320,20 +323,3 @@ class MainWindow(QMainWindow):
                 border-left: 1px solid #2a2a2a;
             }
         """)
-
-
-#Child Windows(?)
-#Pop-up for configuring the given sensor
-class SensorConfigWindow(QWindow):
-    
-    def __init__(self, parent=MainWindow):
-        
-        super().__init__()
-        
-
-#Pop-up for configuring a given module
-class ModuleConfigWindow(QWindow):
-    
-    def __init__(self, parent=MainWindow):
-        
-        super().__init__()

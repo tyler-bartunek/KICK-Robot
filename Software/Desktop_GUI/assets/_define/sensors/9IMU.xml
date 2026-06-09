@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<sensor="6-axis IMU">
+
+    <parameter name="accel_x_bias" label="Accelerometer X Bias" type="double" default="0.0"/>
+    <parameter name="accel_y_bias" label="Accelerometer Y Bias" type="double" default="0.0"/>
+    <parameter name="accel_z_bias" label="Accelerometer Z Bias" type="double" default="0.0"/>
+    <parameter name="gyro_x_bias" label="Gyroscope X Bias" type="double" default="0.0"/>
+    <parameter name="gyro_y_bias" label="Gyroscope Y Bias" type="double" default="0.0"/>
+    <parameter name="gyro_z_bias" label="Gyroscope Z Bias" type="double" default="0.0"/>
+    <parameter name="magnet_x_bias" label="Magnetometer X Bias" type="double" default="0.0">
+    <parameter name="magnet_y_bias" label="Magnetometer Y Bias" type="double" default="0.0">
+    <parameter name="magnet_z_bias" label="Magnetometer Z Bias" type="double" default="0.0">
+
+</sensor>

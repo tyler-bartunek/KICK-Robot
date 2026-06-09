@@ -24,7 +24,20 @@ class ROS_StreamWorker(QObject):
         # Subscribe to bus_state topic
         self.bus_state_subscriber = roslibpy.Topic(self.client, '/bus_state', 'kick_msgs/BusState')
         self.bus_state_subscriber.subscribe(self._bus_state_callback)
+        
+        # Subscribe to vel_cmd topic
+        self.vel_cmd_publisher = roslibpy.Topic(self.client, "vel_cmd", 'geometry_msgs/Twist')
+        self.vel_cmd_publisher.publish(self._velocity_msg_callback)
+        
+        #Connect to config service (just listen in?)
+        self.kinematic_config_listener = roslibpy.Service(self.client, 'ConfigUpdate', 'kick_interfaces/srv/ConfigUpdate')
 
     def _bus_state_callback(self, message):
         # Process the bus state message and emit signals to update the GUI
         print("Received bus state:", message)
+        
+    def _velocity_msg_callback(self, message):
+        #Send the new velocity command to the device
+        
+        pass
+        

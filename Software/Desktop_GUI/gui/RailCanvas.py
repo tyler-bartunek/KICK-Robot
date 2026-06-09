@@ -1,6 +1,9 @@
+from pathlib import Path
+import xml.etree.ElementTree as ET
+
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout,
-    QFormLayout, QPushButton, QLabel,
+    QFormLayout, QPushButton, QLabel, QLineEdit, QComboBox,
     QSpinBox, QSizePolicy
 )
 from PyQt6.QtGui import QPainter, QPen, QColor
@@ -10,6 +13,9 @@ from PyQt6.QtCore import Qt, pyqtSignal
 # Fixed hardware constants — not user-editable at runtime
 RIDGE_COUNT    = 7
 RIDGE_PITCH_MM = 12
+
+#Module Setting Definition file dict
+setting_selection_dict = {}
 
 
 class _DimBracket(QWidget):
@@ -137,6 +143,8 @@ class RailCanvas(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("RailCanvas")
+        
+        self.module_setting_path = Path(__file__).parent.parent / "assets" / "_define" / "modules"
 
         outer = QHBoxLayout(self)
         outer.setContentsMargins(12, 12, 12, 12)
@@ -195,7 +203,48 @@ class RailCanvas(QWidget):
     
     def _populate_sidebar(self) -> QWidget:
         
-        pass
+        form = QFormLayout()
+        
+        try:
+            #TODO: Add in a way to modify based on what/if modules are detected
+            #Current idea: Dictionary that matches xml file to detected modules
+            tree = ET.parse(self.module_setting_path)
+            root = tree.getroot()
+        except (ET.ParseError, FileNotFoundError) as e:
+            form.addRow(f"No recognized module settings found: {e}")
+            return
+        
+        for param in root.findall('config_settings/parameter'):
+            
+            param_name = param.attrib.get("name")
+            param_label = param.attrib.get("label")
+            param_type = param.attrib.get("type")
+            param_default = param.attrib.get("default")
+            
+            entry_builder = {"float":self._float_widget, "double":self._double_widget, "dropdown":self._dropdown_widget}
+            
+            form.addRow(param_label, entry_builder[param_type](param))
+            
+            pass
+        
+    def _float_widget(self, param) -> QWidget:
+        
+        spin_box = QSpinBox()
+        
+        return spin_box
+    
+    def _double_widget(self, param) -> QWidget:
+        
+        entry_box = QLineEdit()
+        
+        return entry_box
+    
+    def _dropdown_widget(self, param) -> QWidget:
+        
+        menu = QComboBox()
+        
+        return menu 
+    
 
     def _on_push(self):
         self.config_changed.emit({

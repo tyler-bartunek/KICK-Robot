@@ -4,6 +4,8 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
+from ros_bridge import ROS_StreamWorker
+
 
 class ControlWidget(QWidget):
     """

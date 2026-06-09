@@ -1,10 +1,8 @@
 
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QListWidget, QFrame
-from PyQt6.QtGui import QWindow
+from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QListWidget, QDialog
 
 
 class _Sensor(QWidget):
-    
     
     def __init__(self, sensor_name:str, parent = None):
         
@@ -24,10 +22,18 @@ class _Sensor(QWidget):
         self.configure_button = QPushButton("Configure")
         self.remove_button = QPushButton("Remove")
         
+        self.configure_button.clicked.connect(self._on_configure_click)
+        
         self.item_container.addWidget(name)
         self.item_container.addWidget(self.configure_button)
         self.item_container.addWidget(self.remove_button)
         
+    def _on_configure_click(self):
+        
+        configure_dialog = QDialog()
+        configure_dialog.setWindowTitle(f"{self.full_name} Configuration")
+        
+        configure_dialog.exec()
 
 class SensorConfigWidget(QWidget):
     
