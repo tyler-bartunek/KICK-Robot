@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<sensor="6-axis IMU">
+<sensor name="6-axis IMU">
 
     <parameter name="accel_x_bias" label="Accelerometer X Bias" type="double" default="0.0"/>
     <parameter name="accel_y_bias" label="Accelerometer Y Bias" type="double" default="0.0"/>

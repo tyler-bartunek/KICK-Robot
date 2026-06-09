@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<sensor>
+<sensor name="Ultrasonic">
 
     <parameter name="" label="" type="double" default="">
 

@@ -4,9 +4,9 @@
 
     <!-- Individual setting parameters -->
     <ind_settings>
-        <parameter name="femur_length" label="Femur Length (cm)" type="double" default="12">
-        <parameter name="tibia_length" label="Tibia Length (cm)" type="double" default="12">
-        <parameter name="shoulder_offset" label="Shoulder Offset (cm)" type="double" default="4">
+        <parameter name="femur_length" label="Femur Length (cm)" type="double" default="12"/>
+        <parameter name="tibia_length" label="Tibia Length (cm)" type="double" default="12"/>
+        <parameter name="shoulder_offset" label="Shoulder Offset (cm)" type="double" default="4"/>
     </ind_settings>
 
     <!-- Configuration-level settings parameters -->

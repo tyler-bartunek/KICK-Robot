@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<sensor>
+<sensor name="LIDAR">
 
+    <parameter name="" label="" type="double" default="0.0">
 
 </sensor>

@@ -1,16 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+
 <module>
 
-    <!-- Individual setting parameters -->
+
+    <!-- Individual module-level settings -->
     <ind_settings>
-        <parameter name="z_offset" label="Axial Offset" type="float" default="20">
+        <parameter name="z_offset" label="Axial Offset" type="float"
+                   default="20" unit="mm" min="0" max="100" />
     </ind_settings>
 
-    <!-- Configuration-level settings parameters -->
+    <!-- Configuration-level settings -->
     <config_settings>
-        <parameter name="wheel_dia" label="Wheel Diameter" type="float" default="65">
-        <parameter name="control_type" label="Control Type" type="dropdown" default="Velocity">
+        <parameter name="wheel_dia" label="Wheel Diameter" type="float"
+                   default="65" unit="mm" min="10" max="200" />
+        <parameter name="control_type" label="Control Type" type="dropdown"
+                   default="vel" options="Velocity:vel,Position:pos" />
     </config_settings>
-
 </module>

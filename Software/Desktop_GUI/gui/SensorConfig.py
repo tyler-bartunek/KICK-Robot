@@ -1,5 +1,12 @@
+from pathlib import Path
+import xml.etree.ElementTree as ET
 
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QListWidget, QDialog
+from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QFormLayout, QLabel, QPushButton, QListWidget, QDialog, QLineEdit
+from PyQt6.QtCore import Qt, pyqtSignal
+
+
+sensor_names = ["6-axis IMU", "9-axis IMU", "LIDAR", "Ultrasonic Distance"]
+sensor_config_path = Path(__file__).parent.parent / "assets" / "_define" / "sensors"
 
 
 class _Sensor(QWidget):
@@ -10,6 +17,8 @@ class _Sensor(QWidget):
         
         #Store the name as an attribute
         self.full_name = sensor_name
+        
+        self.configured = False
         
         #Simplify the name
         simple_name = sensor_name.strip(" ")
@@ -30,24 +39,125 @@ class _Sensor(QWidget):
         
     def _on_configure_click(self):
         
-        configure_dialog = QDialog()
-        configure_dialog.setWindowTitle(f"{self.full_name} Configuration")
+        configure_window = _Sensor_Setting_Window(self)
         
-        configure_dialog.exec()
+        configure_window.exec()
+        
+        
+class _Sensor_Setting_Window(QDialog):
+    
+    def __init__(self, sensor:_Sensor, parent = None):
+        
+        #Set up the basics of the dialog window
+        super().__init__(parent)
+        self.sensor = sensor
+        self.setObjectName("ConfigWindow")
+        self.setWindowTitle(f"{self.sensor.full_name} Configuration")
+        
+        #Put the setting files into a searchable dict
+        self._assemble_setting_dict()
+        
+        #Initialize the settings dict
+        self.settings = {}
+        
+        #Setup the layout
+        outer = QVBoxLayout(self)
+        
+        outer.addWidget(self._build_parameter_section())
+        
+        outer.addStretch(1)
+        
+        save_button = QPushButton("Save Sensor Settings")
+        save_button.clicked.connect(self._on_save)
+        
+        outer.addWidget(save_button)
+        
+    def _build_parameter_section(self) -> QWidget:
+        
+        #Make the QFormLayout
+        container = QWidget()
+        form = QFormLayout(container)
+        
+        self.param_fields = {}
+        
+        root = self._fetch_root(form)
+        
+        if root:
+            for param in root.findall('parameter'):
+                
+                param_name = param.attrib.get('name')
+                param_label = param.attrib.get('label')
+                param_type = param.attrib.get('type')
+                param_default = param.attrib.get('default')
+                
+                entry_box = QLineEdit()
+                if self.sensor.configured:
+                    entry_box.setText(f"{self.sensor.settings[param_name]}")
+                else:
+                    entry_box.setText(f"{param_default}")
+                    
+                form.addRow(param_label, entry_box)
+                
+                self.param_fields[param_name] = entry_box
+            
+        return container
+    
+    def _extract_settings(self):
+        
+        return {name: field.text() for name, field in self.param_fields.items()}      
+    
+    def _fetch_root(self, form = None):    
+        
+        #Try and extract parameters
+        identifier = self.sensor.full_name.split('_')[0]
+        
+        root = None
+        
+        try:
+            file = ET.parse(self.sensor_setting_dict[identifier])
+            root = file.getroot()
+        except FileNotFoundError as f:
+            if form:
+                form.addRow(QLabel(f"No recognized module settings found: {f}"))
+        except ET.ParseError as e:
+            if form:
+                form.addRow(QLabel(f"Unable to parse settings file: {e}"))
+            
+        return root
+    
+    def _on_save(self):
+        
+        self.sensor.settings = self._extract_settings()
+        self.sensor.configured = True
+        self.accept()
+        
+        
+
+    def _assemble_setting_dict(self) -> None:
+        
+        setting_folder_contents = sensor_config_path.iterdir()
+        settings_files = [file for file in setting_folder_contents if file.is_file()]
+        
+        if len(settings_files) != len(sensor_names):
+            raise(KeyError("Mismatch between number of sensor types and expected number of settings files"))
+
+        self.sensor_setting_dict = {sensor:file for sensor, file in zip(sensor_names, settings_files)}
+        
+        
+        
 
 class SensorConfigWidget(QWidget):
     
     '''Sensor configuration UI, which allows users to select which sensors are active from a fixed list of devices, appending it to the active sensor list.
     The active sensor list allows the user to configure the settings of each sensor, and also allows the user to remove sensors from the active list.'''
     
-    sensor_names = ["6-axis IMU", "9-axis IMU", "Ultrasonic Distance", "LIDAR"]
     
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("SensorConfigWidget")
         
         #initialize sensor dict
-        self.sensor_dict = {sensor:-1 for sensor in self.sensor_names}
+        self.sensor_dict = {sensor:-1 for sensor in sensor_names}
 
         outer = QHBoxLayout(self)
         outer.setContentsMargins(12, 12, 12, 12)
@@ -61,6 +171,7 @@ class SensorConfigWidget(QWidget):
         
         outer.addWidget(selection_list)
         outer.addWidget(active_list_section)
+        outer.addStretch(1)
         
         
     def build_selection_list(self) -> QWidget:
@@ -72,7 +183,7 @@ class SensorConfigWidget(QWidget):
         self.slist = QListWidget()
         self.slist.setObjectName("SelectionList")
         self.slist.setMinimumWidth(180)
-        for sensor in self.sensor_names:
+        for sensor in sensor_names:
             self.slist.addItem(sensor)
             
         #Add pushbutton to push to active list
