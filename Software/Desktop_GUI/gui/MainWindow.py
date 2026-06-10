@@ -13,6 +13,9 @@ from PyQt6.QtCore import pyqtSignal as signal
 # Local imports: Discovery tool that uses zeroconf
 from discovery.RobotDiscovery import RobotDiscoveryWorker
 
+# Local imports: ROS worker
+from ros_bridge import ROS_StreamWorker
+
 # Local imports: Side panel, status strip, tab bar
 from gui.StatusStrip import StatusStrip
 from gui.TabBar import TabBar
@@ -214,6 +217,57 @@ class MainWindow(QMainWindow):
         self._discovery_worker.device_removed.connect(self._on_device_removed)
 
         self._discovery_thread.start()
+        
+    def _on_robot_selected(self, hostname: str):
+        if hostname == "No robots found":
+            self._set_status(connected=False)
+            self._teardown_ros_worker()
+            return
+ 
+        self._set_status(connected=False, label="connecting…")
+        self._teardown_ros_worker()   # clean up any previous connection
+        self._init_ros_worker(hostname)
+ 
+    def _init_ros_worker(self, hostname: str):
+        self._ros_thread = QThread(self)
+        self._ros_worker = ROS_StreamWorker()
+        self._ros_worker.moveToThread(self._ros_thread)
+ 
+        # Start connection when thread starts
+        self._ros_thread.started.connect(lambda: self._ros_worker.connect(host=hostname, port=9090))
+ 
+        # Wire bus_state -> RightPanel
+        self._ros_worker.bus_state_updated.connect(self.right_panel.refresh_devices)
+ 
+        # Wire velocity commands -> ROS publisher
+        self.control.velocity_command.connect(
+            lambda velocity: self._ros_worker.publish_velocity(velocity))
+ 
+        # Wire the battery signal
+        self._ros_worker.battery_updated.connect(self.status_strip.update_battery)
+ 
+        self._ros_thread.start()
+        self._set_status(connected=True)
+ 
+    def _teardown_ros_worker(self):
+        if self._ros_worker is not None:
+            self._ros_worker.disconnect()
+        if self._ros_thread is not None:
+            self._ros_thread.quit()
+            self._ros_thread.wait()
+        self._ros_worker = None
+        self._ros_thread = None
+ 
+    # ------------------------------------------------------------------
+    # Update closeEvent to also teardown ROS:
+    # ------------------------------------------------------------------
+    
+    def closeEvent(self, event):
+        self._teardown_ros_worker()
+        self._discovery_worker.stop_discovery()
+        self._discovery_thread.quit()
+        self._discovery_thread.wait()
+        super().closeEvent(event)
 
     def _on_device_found(self, hostname: str):
         if hostname in self._known_robots:
@@ -242,13 +296,6 @@ class MainWindow(QMainWindow):
 
         if self.robot_combo.count() == 0:
             self.robot_combo.addItem("No robots found")
-
-    def _on_robot_selected(self, hostname: str):
-        if hostname == "No robots found":
-            self._set_status(connected=False)
-            return
-        # TODO: initiate roslibpy connection to hostname:9090
-        self._set_status(connected=False, label=f"connecting…")
 
     def _set_status(self, connected: bool, label: str | None = None):
         if connected:

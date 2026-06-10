@@ -4,8 +4,6 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from ros_bridge import ROS_StreamWorker
-
 
 class ControlWidget(QWidget):
     """
@@ -14,7 +12,7 @@ class ControlWidget(QWidget):
     """
 
     # Emitted on every state change: (vx, vy, omega)
-    velocity_command = pyqtSignal(float, float, float)
+    velocity_command = pyqtSignal(dict)
 
     # Jog speed (m/s and rad/s) — tune per platform
     JOG_LINEAR  = 0.3
@@ -24,9 +22,8 @@ class ControlWidget(QWidget):
         super().__init__(parent)
         self.setObjectName("ControlWidget")
 
-        self._vx = 0.0
-        self._vy = 0.0
-        self._omega = 0.0
+        self.velocity = {"linear":{"x":0.0, "y":0.0, "z":0.0}, 
+                         "angular":{"x":0.0, "y":0.0, "z":0.0}}
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -105,6 +102,8 @@ class ControlWidget(QWidget):
         self._vx_lbl    = self._vel_row("vx")
         self._vy_lbl    = self._vel_row("vy")
         self._omega_lbl = self._vel_row("omega")
+        
+        relevant_components = [self.velocity["linear"]["x"], self.velocity["linear"]["y"], self.velocity["angular"]["z"]]
 
         for entry in (self._vx_lbl, self._vy_lbl, self._omega_lbl):
             layout.addLayout(entry["layout"])
@@ -122,12 +121,13 @@ class ControlWidget(QWidget):
         layout.addWidget(v)
         return {"layout": layout, "value": v}
 
-    def _send(self, vx: float, vy: float, omega: float):
-        self._vx, self._vy, self._omega = vx, vy, omega
+    def _send(self, velocity:dict[str,dict[str,float]]):
+        self.velocity = velocity
+        vx, vy, omega = self.velocity["linear"]["x"], self.velocity["linear"]["y"], self.velocity["angular"]["z"]
         self._vx_lbl["value"].setText(f"{vx:.2f}")
         self._vy_lbl["value"].setText(f"{vy:.2f}")
         self._omega_lbl["value"].setText(f"{omega:.2f}")
-        self.velocity_command.emit(vx, vy, omega)
+        self.velocity_command.emit(velocity)
 
     # ------------------------------------------------------------------
     # Call from MainWindow.keyPressEvent / keyReleaseEvent
