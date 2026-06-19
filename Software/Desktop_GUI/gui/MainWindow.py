@@ -10,8 +10,9 @@ from PyQt6.QtGui import QFont, QWindow
 from PyQt6.QtCore import QThread, Qt
 from PyQt6.QtCore import pyqtSignal as signal
 
-# Local imports: Discovery tool that uses zeroconf
-from discovery.RobotDiscovery import RobotDiscoveryWorker
+# Local imports: Device adding wizard
+from connection import AddRobotWizard
+from connection.RobotProfileManager import RobotProfileManager
 
 # Local imports: ROS worker
 from ros_bridge import ROS_StreamWorker
@@ -47,6 +48,7 @@ class MainWindow(QMainWindow):
 
         # Track known robots: hostname -> (QComboBox index)
         self._known_robots: dict[str, int] = {}
+        self.profile_manager = RobotProfileManager()
 
         # Central widget + root layout
         self.central_widget = QWidget()
@@ -57,7 +59,7 @@ class MainWindow(QMainWindow):
 
         self.init_ui()
         self.apply_styles()
-        self.init_discovery()
+        # self.init_discovery()
 
     # ------------------------------------------------------------------ #
     #  UI Assembly                                                         #
@@ -90,6 +92,11 @@ class MainWindow(QMainWindow):
         title.setObjectName("TitleLabel")
         layout.addWidget(title)
         layout.addStretch()
+        
+        self.add_robot_button = QPushButton("Add Robot")
+        self.add_robot_button.setObjectName("RobotWizardButton")
+        self.add_robot_button.clicked.connect(self._on_robot_add_click)
+        layout.addWidget(self.add_robot_button)
 
         # Robot selector — populated by discovery signals
         self.robot_combo = QComboBox()
@@ -98,6 +105,8 @@ class MainWindow(QMainWindow):
         self.robot_combo.addItem("No robots found")
         self.robot_combo.currentTextChanged.connect(self._on_robot_selected)
         layout.addWidget(self.robot_combo)
+        
+        
 
         # Connection status dot + label
         self.status_dot = QLabel("●")
@@ -131,7 +140,8 @@ class MainWindow(QMainWindow):
         tab_bar.layout.addStretch()
   
         center_layout.addWidget(tab_bar)
-        center_layout.addWidget(StatusStrip())
+        self.status_strip = StatusStrip()
+        center_layout.addWidget(self.status_strip)
         
         #Add the main window's central canvas (stacked widget) to the center layout
         center_layout.addWidget(self.central_canvas_layout, stretch=1)
@@ -195,28 +205,12 @@ class MainWindow(QMainWindow):
     #  Discovery                                                           #
     # ------------------------------------------------------------------ #
 
-    def init_discovery(self):
-        """
-        Moves the discovery worker onto a QThread so it never blocks
-        the main (UI) thread. The worker's signals are connected to
-        slots here on the main thread — PyQt6 queues the calls safely.
-        """
-        self._discovery_thread = QThread(self)
-        self._discovery_worker = RobotDiscoveryWorker(
-            service_type="_kickbot._tcp.local."
-        )
-        self._discovery_worker.moveToThread(self._discovery_thread)
-
-        # Wire thread start → worker start
-        self._discovery_thread.started.connect(
-            self._discovery_worker.start_discovery
-        )
-
-        # Wire worker signals → UI slots (safe: cross-thread via Qt queue)
-        self._discovery_worker.device_found.connect(self._on_device_found)
-        self._discovery_worker.device_removed.connect(self._on_device_removed)
-
-        self._discovery_thread.start()
+    def _on_robot_add_click(self):
+        
+        #TODO: Add Robot Wizard stuff
+        add_wizard = AddRobotWizard(self.profile_manager)
+        
+        add_wizard.exec()
         
     def _on_robot_selected(self, hostname: str):
         if hostname == "No robots found":
@@ -238,13 +232,15 @@ class MainWindow(QMainWindow):
  
         # Wire bus_state -> RightPanel
         self._ros_worker.bus_state_updated.connect(self.right_panel.refresh_devices)
+        
+        #Now to Status_strip
+        self._ros_worker.bus_state_updated.connect(self.status_strip.update_bus)
+        self._ros_worker.battery_updated.connect(self.status_strip.update_battery)
+        self._ros_worker.cmd_vel_active.connect(self.status_strip.update_cmdvel)
  
         # Wire velocity commands -> ROS publisher
         self.control.velocity_command.connect(
             lambda velocity: self._ros_worker.publish_velocity(velocity))
- 
-        # Wire the battery signal
-        self._ros_worker.battery_updated.connect(self.status_strip.update_battery)
  
         self._ros_thread.start()
         self._set_status(connected=True)
@@ -264,9 +260,7 @@ class MainWindow(QMainWindow):
     
     def closeEvent(self, event):
         self._teardown_ros_worker()
-        self._discovery_worker.stop_discovery()
-        self._discovery_thread.quit()
-        self._discovery_thread.wait()
+        #TODO: Figure out what to do with the wizard
         super().closeEvent(event)
 
     def _on_device_found(self, hostname: str):
@@ -308,16 +302,6 @@ class MainWindow(QMainWindow):
         self.status_dot.style().unpolish(self.status_dot)
         self.status_dot.style().polish(self.status_dot)
 
-    # ------------------------------------------------------------------ #
-    #  Cleanup                                                             #
-    # ------------------------------------------------------------------ #
-
-    def closeEvent(self, event):
-        """Ensure background thread is stopped cleanly on window close."""
-        self._discovery_worker.stop_discovery()
-        self._discovery_thread.quit()
-        self._discovery_thread.wait()
-        super().closeEvent(event)
 
     # ------------------------------------------------------------------ #
     #  Styles                                                              #

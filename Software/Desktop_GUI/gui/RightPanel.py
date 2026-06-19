@@ -135,7 +135,7 @@ class RightPanel(QWidget):
         """
         Replace device list with fresh data.
         Each dict: { "address": str, "position": str,
-                     "type": str, "fault": bool }
+                     "type": str}
         """
         # Clear existing items (keep header)
         while self._device_list_layout.count() > 1:
@@ -147,7 +147,7 @@ class RightPanel(QWidget):
             self._device_list_layout.addWidget(
                 _DeviceItem(
                     d["address"], d["position"],
-                    d["type"], d.get("fault", False)
+                    d["type"]
                 )
             )
         self._device_list_layout.addStretch()

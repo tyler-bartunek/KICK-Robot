@@ -53,12 +53,12 @@ class _BatteryCard(QWidget):
         layout.addWidget(self._bar_bg)
         layout.addWidget(self._voltage)
 
-    def set_battery(self, percent: float, voltage: float):
-        self._percent = percent
-        self._pct.setText(f"{percent:.0f}%")
+    def set_battery(self, voltage: float):
+        self._percent = voltage / 16.8
+        self._pct.setText(f"{self._percent:.0f}%")
         self._voltage.setText(f"{voltage:.2f} V avg")
         self._update_fill()
-        state = "ok" if percent > 40 else ("warn" if percent > 20 else "error")
+        state = "ok" if self._percent > 40 else ("warn" if self._percent > 20 else "error")
         self._pct.setObjectName(f"StatCardValue_{state}")
         self._pct.style().unpolish(self._pct)
         self._pct.style().polish(self._pct)
@@ -80,7 +80,7 @@ class StatusStrip(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(12, 0, 12, 0)
         layout.setSpacing(6)
-        self._bus     = _StatCard("bus devices", "---")
+        self._bus     = _StatCard("bus devices", "0/6")
         self._faults  = _StatCard("faults", "---")
         self._cmdvel  = _StatCard("cmd_vel", "inactive")
         self._loop    = _StatCard("loop", "--- Hz")
@@ -89,9 +89,10 @@ class StatusStrip(QWidget):
             layout.addWidget(card, stretch=1)
         layout.addWidget(self._battery, stretch=1)
 
-    def update_bus(self, connected: int, total: int):
-        self._bus.set_value(f"{connected} / {total}",
-                            "ok" if connected == total else "warn")
+    def update_bus(self, devices:list):
+        connected = len(devices)
+        self._bus.set_value(f"{connected} / {6}",
+                            "ok" if ((connected <= 6) and (connected > 0)) else "warn")
 
     def update_faults(self, count: int):
         self._faults.set_value(str(count), "normal" if count == 0 else "warn")
@@ -103,5 +104,5 @@ class StatusStrip(QWidget):
     def update_loop(self, hz: float):
         self._loop.set_value(f"{hz:.0f} Hz")
 
-    def update_battery(self, percent: float, voltage: float):
-        self._battery.set_battery(percent, voltage)
+    def update_battery(self, voltage: float):
+        self._battery.set_battery(voltage)

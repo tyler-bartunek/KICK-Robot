@@ -90,15 +90,14 @@ class ROS_StreamWorker(QObject):
             offset     = slot * DEVICE_DATA_STRIDE
             slot_bytes = data[offset : offset + DEVICE_DATA_STRIDE]
  
-            # Fault detection — adapt to your firmware's convention.
-            # Current assumption: byte 0 bit 0 = fault flag.
-            fault = bool(slot_bytes[0] & 0x01) if slot_bytes else False
+            # # Fault detection — adapt to your firmware's convention.
+            # # Current assumption: byte 0 bit 0 = fault flag.
+            # fault = bool(slot_bytes[0] & 0x01) if slot_bytes else False
  
             devices.append({
                 "address":  f"0x{hw_id:02X}",
                 "position": str(slot),
                 "type":     _hw_id_to_type(hw_id),
-                "fault":    fault,
             })
  
         self.bus_state_updated.emit(devices)
