@@ -10,34 +10,31 @@ from PyQt6.QtGui import QFont, QWindow
 from PyQt6.QtCore import QThread, Qt
 from PyQt6.QtCore import pyqtSignal as signal
 
+#Local imports: Titlebar and Toolbar
+from gui._section_title_bar import TitleBar
+from gui._section_toolbar import Toolbar
+
 # Local imports: Device adding wizard
 from connection import AddRobotWizard
 from connection.RobotProfileManager import RobotProfileManager
 
 # Local imports: ROS worker
-from ros_bridge import ROS_StreamWorker
+from ros_bridge.ROS_Stream import ROS_StreamWorker #REMOVE
+# from ros_ws.src.interface import interface_node    #Incorporate, check if we should go from src or build
 
-# Local imports: Side panel, status strip, tab bar
-from gui.StatusStrip import StatusStrip
-from gui.TabBar import TabBar
-from gui.RightPanel import RightPanel
+# Local imports: central canvas
+from gui._section_middle import MiddleSection
 
-# Local imports: central canvas widgets
-from gui.RailCanvas import RailCanvas
-from gui.SensorConfig import SensorConfigWidget
-from gui.SLAM_Map import SLAM_MapWidget
-
-#Local imports: bottom widgets
-from gui.FaultLog import FaultLogWidget
-from gui.OrientationWidget import OrientationWidget
-from gui.ControlWidget import ControlWidget
-from gui.LaunchPanel import LaunchPanel
+#Local imports: bottom portion
+from gui._section_bottom import BottomSection
 
 
 IMG_DIR = Path(__file__).parent.parent / "assets" / "img"
 
 
 class MainWindow(QMainWindow):
+    
+    
     def __init__(self):
         super().__init__()
 
@@ -68,141 +65,21 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------ #
 
     def init_ui(self):
-        self.title_bar = self.build_title_bar()
+        #TODO: Implement toolbar
+        # self.toolbar = Toolbar() 
+        
+        #Add the title bar, connect relevant signals
+        self.title_bar = TitleBar(IMG_DIR / "KICK_shoeprint_logo.png")
+        self.title_bar.add_robot_button.clicked.connect(self._on_robot_add_click)
+        self.title_bar.robot_combo.currentTextChanged.connect(self._on_robot_selected)
         self.main_layout.addWidget(self.title_bar)
 
-        self.middle_section = self.build_middle_section()
+        self.middle_section = MiddleSection()
         self.main_layout.addLayout(self.middle_section, stretch=4)
 
-        self.bottom_section = self.build_bottom_section()
+        self.bottom_section = BottomSection()
         self.main_layout.addLayout(self.bottom_section, stretch=1)
-
-    def build_title_bar(self) -> QWidget:
         
-        container = QWidget()
-        container.setObjectName("TitleBar")
-        container.setFixedHeight(40)
-        layout = QHBoxLayout(container)
-        layout.setContentsMargins(14, 0, 14, 0)
-        layout.setSpacing(12)
-
-        
-        title = QLabel()
-        title.setText(
-                      f"<h1><img src='{IMG_DIR / 'KICK_shoeprint_logo.png'}' width='30' height='30'> KICK Robot Desktop </h1>"
-                      )
-        title.setObjectName("TitleLabel")
-        layout.addWidget(title)
-        layout.addStretch()
-        
-        self.add_robot_button = QPushButton("Add Robot")
-        self.add_robot_button.setObjectName("RobotWizardButton")
-        self.add_robot_button.clicked.connect(self._on_robot_add_click)
-        layout.addWidget(self.add_robot_button)
-
-        # Robot selector — populated by discovery signals
-        self.robot_combo = QComboBox()
-        self.robot_combo.setObjectName("RobotCombo")
-        self.robot_combo.setMinimumWidth(180)
-        self.robot_combo.addItem("No robots found")
-        self.robot_combo.currentTextChanged.connect(self._on_robot_selected)
-        layout.addWidget(self.robot_combo)
-        
-        
-
-        # Connection status dot + label
-        self.status_dot = QLabel("●")
-        self.status_dot.setObjectName("StatusDotDisconnected")
-        layout.addWidget(self.status_dot)
-
-        self.status_label = QLabel("disconnected")
-        self.status_label.setObjectName("StatusLabel")
-        layout.addWidget(self.status_label)
-
-        return container
-
-    def build_middle_section(self) -> QHBoxLayout:
-        layout = QHBoxLayout()
-        layout.setSpacing(1)
-
-        # Center workspace: tabs + rail canvas
-        center_container = QWidget()
-        center_container.setObjectName("CenterWorkspace")
-        center_layout = QVBoxLayout(center_container)
-        center_layout.setContentsMargins(0, 0, 0, 0)
-        center_layout.setSpacing(0)
-        
-        self.central_canvas_layout = self.build_central_stacked_window()
-        
-        tab_bar = TabBar()
-        tab_bar.hardware_btn.clicked.connect(lambda: self.central_canvas_layout.setCurrentIndex(0))
-        tab_bar.sensor_btn.clicked.connect(lambda: self.central_canvas_layout.setCurrentIndex(1))
-        tab_bar.slam_btn.clicked.connect(lambda: self.central_canvas_layout.setCurrentIndex(2))
-        tab_bar.add_widgets([tab_bar.hardware_btn, tab_bar.sensor_btn, tab_bar.slam_btn])
-        tab_bar.layout.addStretch()
-  
-        center_layout.addWidget(tab_bar)
-        self.status_strip = StatusStrip()
-        center_layout.addWidget(self.status_strip)
-        
-        #Add the main window's central canvas (stacked widget) to the center layout
-        center_layout.addWidget(self.central_canvas_layout, stretch=1)
-
-        # Right sidebar: module library + detected devices
-        right_container = QWidget()
-        right_container.setObjectName("RightPanel")
-        right_container.setFixedWidth(190)
-        right_layout = QVBoxLayout(right_container)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(0)
-        self.right_panel = RightPanel()
-        right_layout.addWidget(self.right_panel, stretch=1)
-
-        layout.addWidget(center_container, stretch=1)
-        layout.addWidget(right_container)
-        return layout
-    
-    def build_central_stacked_window(self) -> QStackedWidget:
-        
-        #Create the central stacked window, which will hold the different tab contents
-        stacked_widget = QStackedWidget()
-        
-        self.rail_canvas = RailCanvas()
-        self.sensor_canvas = SensorConfigWidget()
-        self.slam_canvas = SLAM_MapWidget()
-        
-        stacked_widget.addWidget(self.rail_canvas)
-        stacked_widget.addWidget(self.sensor_canvas)
-        stacked_widget.addWidget(self.slam_canvas)    
-        
-        return stacked_widget
-
-    def build_bottom_section(self) -> QHBoxLayout:
-        layout = QHBoxLayout()
-        layout.setSpacing(1)
-
-        # Bottom left: fault log | orientation | control
-        bottom_left = QWidget()
-        bottom_left.setObjectName("BottomLeft")
-        bl_layout = QHBoxLayout(bottom_left)
-        bl_layout.setContentsMargins(10, 8, 10, 8)
-        bl_layout.setSpacing(14)
-        self.fault_log = FaultLogWidget()
-        bl_layout.addWidget(self.fault_log, stretch=1)
-        bl_layout.addWidget(OrientationWidget(), stretch=1)
-        bl_layout.addWidget(ControlWidget(), stretch=1)
-
-        # Bottom right: launch profile
-        bottom_right = QWidget()
-        bottom_right.setObjectName("BottomRightLaunch")
-        bottom_right.setFixedWidth(190)
-        br_layout = QVBoxLayout(bottom_right)
-        br_layout.setContentsMargins(10, 8, 10, 8)
-        br_layout.addWidget(LaunchPanel())
-
-        layout.addWidget(bottom_left, stretch=1)
-        layout.addWidget(bottom_right)
-        return layout
 
     # ------------------------------------------------------------------ #
     #  Discovery                                                           #

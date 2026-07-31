@@ -16,8 +16,8 @@ services:
 
     #Temporary for dev: sleep infinity
     # entrypoint: ["sh", "-c", "sleep infinity"]
-    #Temporarily suppress for dev, need to add bash command to source the venv
-    # Also consider how the colcon stuff will actually work in practice. 
+
+    #Temporarily suppress for dev
     command: >
       bash -c "source /ros_entrypoint.sh &&
                cd /root/ros_ws && colcon build --symlink-install &&
