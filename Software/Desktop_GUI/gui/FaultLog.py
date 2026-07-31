@@ -1,7 +1,6 @@
 
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel
-
-from ros_bridge.ROS_Stream import ROS_StreamWorker
+from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot
 
 
 class FaultLogWidget(QWidget):
@@ -22,3 +21,8 @@ class FaultLogWidget(QWidget):
         
         #Later: listen to robot status updates from ROS_StreamWorker and display faults in a scrollable list. For now, just a placeholder.
         layout.addWidget(QLabel("No faults detected."))
+        
+    def update_faults(self, message: str):
+        '''Update the fault log with a new message.'''
+        #For now, just print the message to the console. Later, this will update the GUI.
+        print(f"Fault log update: {message}")

@@ -1,0 +1,24 @@
+#Container name automatically desktop_gui because that is the parent folder for this compose file.
+name: desktop-gui 
+services:
+  kickbot_desktop:
+    image: kick-gui
+    container_name: kick-gui        # Specific container instance name
+    network_mode: host              # required for DDS multicast to Pi subnet
+    environment:
+      - DISPLAY=${DISPLAY}          # WSLg sets this automatically on Win11
+      - ROS_DOMAIN_ID=42
+      - PYTHONPATH=/app
+    volumes:
+      - .:/app                                    # full Desktop_GUI/ directory
+      - ${APPDATA}/KICKRobot:/config              # persistent config (Win host)
+      - ./ros_ws:/root/ros_ws                     # ROS workspace
+
+    #Temporary for dev: sleep infinity
+    # entrypoint: ["sh", "-c", "sleep infinity"]
+    #Temporarily suppress for dev, need to add bash command to source the venv
+    # Also consider how the colcon stuff will actually work in practice. 
+    command: >
+      bash -c "source /ros_entrypoint.sh &&
+               cd /root/ros_ws && colcon build --symlink-install &&
+               cd /app && python3 -m pip install -r requirements.txt && python3 main.py"

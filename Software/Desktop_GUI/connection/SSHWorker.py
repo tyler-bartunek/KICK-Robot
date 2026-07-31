@@ -52,6 +52,7 @@ class SSHWorker(QObject):
     # ------------------------------------------------------------------
 
     def connect(self, hostname: str, username: str, password: str):
+        
         if not PARAMIKO_AVAILABLE:
             self.connection_failed.emit("paramiko not installed")
             return

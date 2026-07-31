@@ -49,6 +49,8 @@ class MainWindow(QMainWindow):
         # Track known robots: hostname -> (QComboBox index)
         self._known_robots: dict[str, int] = {}
         self.profile_manager = RobotProfileManager()
+        self._ros_worker: ROS_StreamWorker | None = None
+        self._ros_thread: QThread | None = None
 
         # Central widget + root layout
         self.central_widget = QWidget()
@@ -185,7 +187,8 @@ class MainWindow(QMainWindow):
         bl_layout = QHBoxLayout(bottom_left)
         bl_layout.setContentsMargins(10, 8, 10, 8)
         bl_layout.setSpacing(14)
-        bl_layout.addWidget(FaultLogWidget(), stretch=1)
+        self.fault_log = FaultLogWidget()
+        bl_layout.addWidget(self.fault_log, stretch=1)
         bl_layout.addWidget(OrientationWidget(), stretch=1)
         bl_layout.addWidget(ControlWidget(), stretch=1)
 
@@ -207,7 +210,7 @@ class MainWindow(QMainWindow):
 
     def _on_robot_add_click(self):
         
-        #TODO: Add Robot Wizard stuff
+        #Open the AddRobotWizard dialog to add a new robot profile
         add_wizard = AddRobotWizard(self.profile_manager)
         
         add_wizard.exec()
@@ -223,6 +226,7 @@ class MainWindow(QMainWindow):
         self._init_ros_worker(hostname)
  
     def _init_ros_worker(self, hostname: str):
+        
         self._ros_thread = QThread(self)
         self._ros_worker = ROS_StreamWorker()
         self._ros_worker.moveToThread(self._ros_thread)
@@ -237,6 +241,9 @@ class MainWindow(QMainWindow):
         self._ros_worker.bus_state_updated.connect(self.status_strip.update_bus)
         self._ros_worker.battery_updated.connect(self.status_strip.update_battery)
         self._ros_worker.cmd_vel_active.connect(self.status_strip.update_cmdvel)
+        
+        #Connect the fault log
+        self._ros_worker.log_message.connect(self.fault_log.update_faults)
  
         # Wire velocity commands -> ROS publisher
         self.control.velocity_command.connect(

@@ -13,6 +13,16 @@ class ControlWidget(QWidget):
 
     # Emitted on every state change: (vx, vy, omega)
     velocity_command = pyqtSignal(dict)
+    
+    ZERO_VEL = {"linear":{
+        "x":0.0,
+        "y":0.0,
+        "z":0.0},
+        "angular":{
+            "x":0.0,
+            "y":0.0,
+            "z":0.0}
+        }
 
     # Jog speed (m/s and rad/s) — tune per platform
     JOG_LINEAR  = 0.3
@@ -86,10 +96,8 @@ class ControlWidget(QWidget):
                     )
                     btn.setFixedSize(28, 28)
                     vx, vy, om = actions[cell]
-                    btn.pressed.connect(
-                        lambda v=(vx, vy, om): self._send(v[0], v[1], v[2])
-                    )
-                    btn.released.connect(lambda: self._send(0, 0, 0))
+                    btn.pressed.connect(lambda: self._send(self.velocity))
+                    btn.released.connect(lambda: self._send(self.ZERO_VEL))
                     row_layout.addWidget(btn)
             grid_layout.addLayout(row_layout)
 
@@ -121,9 +129,8 @@ class ControlWidget(QWidget):
         layout.addWidget(v)
         return {"layout": layout, "value": v}
 
-    def _send(self, velocity:dict[str,dict[str,float]]):
-        self.velocity = velocity
-        vx, vy, omega = self.velocity["linear"]["x"], self.velocity["linear"]["y"], self.velocity["angular"]["z"]
+    def _send(self, velocity):
+        vx, vy, omega = velocity["linear"]["x"], velocity["linear"]["y"], velocity["angular"]["z"]
         self._vx_lbl["value"].setText(f"{vx:.2f}")
         self._vy_lbl["value"].setText(f"{vy:.2f}")
         self._omega_lbl["value"].setText(f"{omega:.2f}")

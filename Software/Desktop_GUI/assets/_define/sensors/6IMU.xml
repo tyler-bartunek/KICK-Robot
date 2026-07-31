@@ -2,9 +2,22 @@
 
 <sensor name="6-axis IMU">
 
+    <parameter name="I2C_address" label="I2C Address" type="hex" default="0x68"/>
+    <parameter name="accel_range" label="Accelerometer Range" type="enum" default="2g">
+        <option value="2g">±2g</option>
+        <option value="4g">±4g</option>
+        <option value="8g">±8g</option>
+        <option value="16g">±16g</option>
+    </parameter>
     <parameter name="accel_x_bias" label="Accelerometer X Bias" type="double" default="0.0"/>
     <parameter name="accel_y_bias" label="Accelerometer Y Bias" type="double" default="0.0"/>
     <parameter name="accel_z_bias" label="Accelerometer Z Bias" type="double" default="0.0"/>
+    <parameter name="gyro_range" label="Gyroscope Range" type="enum" default="250dps">
+        <option value="250dps">±250°/s</option>
+        <option value="500dps">±500°/s</option>
+        <option value="1000dps">±1000°/s</option>
+        <option value="2000dps">±2000°/s</option>
+    </parameter>
     <parameter name="gyro_x_bias" label="Gyroscope X Bias" type="double" default="0.0"/>
     <parameter name="gyro_y_bias" label="Gyroscope Y Bias" type="double" default="0.0"/>
     <parameter name="gyro_z_bias" label="Gyroscope Z Bias" type="double" default="0.0"/>

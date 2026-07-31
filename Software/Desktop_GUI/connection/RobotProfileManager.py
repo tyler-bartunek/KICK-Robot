@@ -22,6 +22,7 @@ KEYRING_SERVICE = "kickbot_gui"
 
 @dataclass
 class RobotProfile:
+    
     alias:     str
     hostname:  str
     username:  str

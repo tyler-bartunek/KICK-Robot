@@ -27,7 +27,8 @@ class ROS_StreamWorker(QObject):
     # Define signals to communicate with the GUI
     bus_state_updated = pyqtSignal(list)  # Emitted when a new bus state message is received
     battery_updated = pyqtSignal(float) #Emitted when a new battery state is received
-    cmd_vel_active = pyqtSignal(bool)
+    cmd_vel_active = pyqtSignal(bool) #Emitted when the cmd_vel publisher is advertised or unadvertised
+    log_message = pyqtSignal(str) #Emitted for logging messages to the GUI
 
     def __init__(self, parent=None):
         
