@@ -2,23 +2,30 @@
 name: desktop-gui 
 services:
   kickbot_desktop:
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: kick-gui
     container_name: kick-gui        # Specific container instance name
     network_mode: host              # required for DDS multicast to Pi subnet
     environment:
-      - DISPLAY=${DISPLAY}          # WSLg sets this automatically on Win11
+      - DISPLAY=${DISPLAY}          # value comes from .env now -- see note there
+      - WAYLAND_DISPLAY=${WAYLAND_DISPLAY}   # passed through from the invoking WSL shell -- do NOT hardcode in .env, this changes per session
+      - XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR}   # same -- must come from the real shell env
       - ROS_DOMAIN_ID=42
       - PYTHONPATH=/app
     volumes:
       - .:/app                                    # full Desktop_GUI/ directory
-      - ${APPDATA}/KICKRobot:/config              # persistent config (Win host)
-      - ./ros_ws:/root/ros_ws                     # ROS workspace
+      - ${KICKROBOT_CONFIG_DIR}:/config            # persistent config -- WSL-style path, set in .env
+      - ./ros_ws:/root/ros_ws                      # ROS workspace
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw           # X11 socket -- required for Qt to reach WSLg's X server
+      - /mnt/wslg:/mnt/wslg:rw                     # underlying WSLg socket dir -- /tmp/.X11-unix alone wasn't enough
 
     #Temporary for dev: sleep infinity
     # entrypoint: ["sh", "-c", "sleep infinity"]
 
-    #Temporarily suppress for dev
+    #Temporarily suppress for dev -> Consider adding --break-system-packages to pip install commmand if we get errors about pip
     command: >
       bash -c "source /ros_entrypoint.sh &&
                cd /root/ros_ws && colcon build --symlink-install &&
-               cd /app && python3 -m pip install -r requirements.txt && python3 main.py"
+               cd /app && python3 -m pip install --break-system-packages -r requirements.txt && python3 main.py"
