@@ -233,6 +233,8 @@ class SensorConfigWidget(QWidget):
         
         #Remove the sensor from the widget
         self.active_list.removeWidget(sensor)
+        sensor.setParent(None)
+        sensor.deleteLater()
            
                 
     def generate_unique_active(self, new_sensor: str):
