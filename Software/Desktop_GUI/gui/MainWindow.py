@@ -20,7 +20,6 @@ from connection.RobotProfileManager import RobotProfileManager
 
 # Local imports: ROS worker
 from ros_bridge.ROS_Stream import ROS_StreamWorker #REMOVE
-# from ros_ws.src.interface import interface_node    #Incorporate, check if we should go from src or build
 
 # Local imports: central canvas
 from gui._section_middle import MiddleSection
