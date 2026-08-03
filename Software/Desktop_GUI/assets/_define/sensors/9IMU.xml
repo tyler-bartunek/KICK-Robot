@@ -8,8 +8,8 @@
     <parameter name="gyro_x_bias" label="Gyroscope X Bias" type="double" default="0.0"/>
     <parameter name="gyro_y_bias" label="Gyroscope Y Bias" type="double" default="0.0"/>
     <parameter name="gyro_z_bias" label="Gyroscope Z Bias" type="double" default="0.0"/>
-    <parameter name="magnet_x_bias" label="Magnetometer X Bias" type="double" default="0.0">
-    <parameter name="magnet_y_bias" label="Magnetometer Y Bias" type="double" default="0.0">
-    <parameter name="magnet_z_bias" label="Magnetometer Z Bias" type="double" default="0.0">
+    <parameter name="magnet_x_bias" label="Magnetometer X Bias" type="double" default="0.0"/>
+    <parameter name="magnet_y_bias" label="Magnetometer Y Bias" type="double" default="0.0"/>
+    <parameter name="magnet_z_bias" label="Magnetometer Z Bias" type="double" default="0.0"/>
 
 </sensor>

@@ -2,6 +2,6 @@
 
 <sensor name="LIDAR">
 
-    <parameter name="" label="" type="double" default="0.0">
+    <parameter name="" label="" type="double" default="0.0"/>
 
 </sensor>
