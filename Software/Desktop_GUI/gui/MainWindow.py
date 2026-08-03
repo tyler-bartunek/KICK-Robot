@@ -14,9 +14,8 @@ from PyQt6.QtCore import pyqtSignal as signal
 from gui._section_title_bar import TitleBar
 from gui._section_toolbar import Toolbar
 
-# Local imports: Device adding wizard
-from connection import AddRobotWizard
-from connection.RobotProfileManager import RobotProfileManager
+# Local imports: Device adding
+from connection import DiscoveryWorker, RobotProfileManager
 
 # Local imports: ROS worker
 from ros_bridge.ROS_Stream import ROS_StreamWorker #REMOVE
@@ -81,15 +80,21 @@ class MainWindow(QMainWindow):
         
 
     # ------------------------------------------------------------------ #
-    #  Discovery                                                           #
+    #  Discovery                                                         #
     # ------------------------------------------------------------------ #
 
-    def _on_robot_add_click(self):
+    # def _on_robot_add_click(self):
         
-        #Open the AddRobotWizard dialog to add a new robot profile
-        add_wizard = AddRobotWizard(self.profile_manager)
+    #     #Open the AddRobotWizard dialog to add a new robot profile
+    #     add_wizard = AddRobotWizard(self.profile_manager)
         
-        add_wizard.exec()
+    #     add_wizard.exec()
+    
+    def _discover_devices(self):
+        
+        #Initialize the DiscoveryWorker to discover devices on the network
+        self.discovery_worker = DiscoveryWorker()
+        self.discovery_worker.device_found.connect(self._on_device_found)
         
     def _on_robot_selected(self, hostname: str):
         if hostname == "No robots found":
