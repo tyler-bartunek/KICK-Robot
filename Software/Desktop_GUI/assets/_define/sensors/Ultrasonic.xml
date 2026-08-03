@@ -2,6 +2,6 @@
 
 <sensor name="Ultrasonic">
 
-    <parameter name="" label="" type="double" default="">
+    <parameter name="" label="" type="double" default=""/>
 
 </sensor>

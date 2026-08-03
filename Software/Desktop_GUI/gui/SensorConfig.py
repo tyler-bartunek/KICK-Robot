@@ -4,8 +4,10 @@ import xml.etree.ElementTree as ET
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QFormLayout, QLabel, QPushButton, QListWidget, QDialog, QLineEdit
 from PyQt6.QtCore import Qt, pyqtSignal
 
-
+#Hate hard-coding this, but I've been left with little choice.
 sensor_names = ["6-axis IMU", "9-axis IMU", "LIDAR", "Ultrasonic Distance"]
+setting_filenames = ["6IMU.xml", "9IMU.xml", "LIDAR.xml", "Ultrasonic.xml"]
+sensor_setting_dict = {sensor:file for sensor, file in zip(sensor_names, setting_filenames)}
 sensor_config_path = Path(__file__).parent.parent / "assets" / "_define" / "sensors"
 
 
@@ -110,6 +112,7 @@ class _Sensor_Setting_Window(QDialog):
         
         #Try and extract parameters
         identifier = self.sensor.full_name.split('_')[0]
+        print(identifier)
         
         root = None
         
@@ -135,11 +138,7 @@ class _Sensor_Setting_Window(QDialog):
 
     def _assemble_setting_dict(self) -> None:
         
-        setting_folder_contents = sensor_config_path.iterdir()
-        settings_files = [file for file in setting_folder_contents if file.is_file()]
-        
-        if len(settings_files) != len(sensor_names):
-            raise(KeyError("Mismatch between number of sensor types and expected number of settings files"))
+        settings_files = [sensor_config_path / file for file in setting_filenames]
 
         self.sensor_setting_dict = {sensor:file for sensor, file in zip(sensor_names, settings_files)}
         
