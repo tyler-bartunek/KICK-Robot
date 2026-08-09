@@ -15,7 +15,7 @@ from gui._section_title_bar import TitleBar
 from gui._section_toolbar import Toolbar
 
 # Local imports: Device adding
-from connection import DiscoveryWorker, RobotProfileManager
+from connection import DNSWorker, RobotProfileManager
 
 # Local imports: ROS worker
 from ros_bridge.ROS_Stream import ROS_StreamWorker #REMOVE
@@ -55,8 +55,9 @@ class MainWindow(QMainWindow):
         self.main_layout.setSpacing(1)
 
         self.init_ui()
+        self._discover_devices()
         self.apply_styles()
-        # self.init_discovery()
+        
 
     # ------------------------------------------------------------------ #
     #  UI Assembly                                                         #
@@ -64,11 +65,11 @@ class MainWindow(QMainWindow):
 
     def init_ui(self):
         #TODO: Implement toolbar
-        # self.toolbar = Toolbar() 
+        self.toolbar = Toolbar(self) 
+        self.main_layout.addWidget(self.toolbar)
         
         #Add the title bar, connect relevant signals
         self.title_bar = TitleBar(IMG_DIR / "KICK_shoeprint_logo.png")
-        self.title_bar.add_robot_button.clicked.connect(self._on_robot_add_click)
         self.title_bar.robot_combo.currentTextChanged.connect(self._on_robot_selected)
         self.main_layout.addWidget(self.title_bar)
 
@@ -93,10 +94,14 @@ class MainWindow(QMainWindow):
     def _discover_devices(self):
         
         #Initialize the DiscoveryWorker to discover devices on the network
-        self.discovery_worker = DiscoveryWorker()
-        self.discovery_worker.device_found.connect(self._on_device_found)
+        self._dns_thread = QThread(self)
+        self.dns_worker = DNSWorker()
+        self.dns_worker.moveToThread(self._dns_thread)
+        self._dns_thread.start()
+        self.dns_worker.start_discovery()
         
     def _on_robot_selected(self, hostname: str):
+        
         if hostname == "No robots found":
             self._set_status(connected=False)
             self._teardown_ros_worker()
@@ -145,9 +150,18 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
     # Update closeEvent to also teardown ROS:
     # ------------------------------------------------------------------
+    def _teardown_dns_worker(self):
+        if self.dns_worker is not None:
+            self.dns_worker.on_window_close()
+        if self._dns_thread is not None:
+            self._dns_thread.quit()
+            self._dns_thread.wait()
+        self.dns_worker = None
+        self._dns_thread = None
     
     def closeEvent(self, event):
         self._teardown_ros_worker()
+        self._teardown_dns_worker()
         #TODO: Figure out what to do with the wizard
         super().closeEvent(event)
 
