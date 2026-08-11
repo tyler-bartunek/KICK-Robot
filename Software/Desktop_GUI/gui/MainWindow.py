@@ -11,11 +11,11 @@ from PyQt6.QtCore import QThread, Qt
 from PyQt6.QtCore import pyqtSignal as signal
 
 #Local imports: Titlebar and Toolbar
-from gui._section_title_bar import TitleBar
+from gui._section_title_bar import TitleBar, RobotItem
 from gui._section_toolbar import Toolbar
 
 # Local imports: Device adding
-from connection import DNSWorker, RobotProfileManager
+from connection import DNSWorker, RobotProfile, RobotProfileManager
 
 # Local imports: ROS worker
 from ros_bridge.ROS_Stream import ROS_StreamWorker #REMOVE
@@ -46,6 +46,8 @@ class MainWindow(QMainWindow):
         self.profile_manager = RobotProfileManager()
         self._ros_worker: ROS_StreamWorker | None = None
         self._ros_thread: QThread | None = None
+        self._dns_worker: DNSWorker | None = None
+        self._dns_thread: QThread | None = None
 
         # Central widget + root layout
         self.central_widget = QWidget()
@@ -70,7 +72,7 @@ class MainWindow(QMainWindow):
         
         #Add the title bar, connect relevant signals
         self.title_bar = TitleBar(IMG_DIR / "KICK_shoeprint_logo.png")
-        self.title_bar.robot_combo.currentTextChanged.connect(self._on_robot_selected)
+        # self.title_bar.robot_combo.currentTextChanged.connect(self._on_device_found)
         self.main_layout.addWidget(self.title_bar)
 
         self.middle_section = MiddleSection()
@@ -83,14 +85,6 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------ #
     #  Discovery                                                         #
     # ------------------------------------------------------------------ #
-
-    # def _on_robot_add_click(self):
-        
-    #     #Open the AddRobotWizard dialog to add a new robot profile
-    #     add_wizard = AddRobotWizard(self.profile_manager)
-        
-    #     add_wizard.exec()
-    
     def _discover_devices(self):
         
         #Initialize the DiscoveryWorker to discover devices on the network
@@ -99,6 +93,36 @@ class MainWindow(QMainWindow):
         self.dns_worker.moveToThread(self._dns_thread)
         self._dns_thread.start()
         self.dns_worker.start_discovery()
+        self.dns_worker.device_discovered.connect(self._on_device_found)
+        
+    def _on_device_found(self, hostname: str):
+            
+        if hostname in self._known_robots:
+            return  # Already listed
+
+        # # Remove the placeholder if this is the first real robot
+        # if "No robots found" in [
+        #     self.title_bar.robot_combo.itemText(i)
+        #     for i in range(self.title_bar.robot_combo.count())
+        # ]:
+        #     self.title_bar.robot_combo.clear()
+        #     self._known_robots.clear()
+
+        #Instantiate a RobotProfile and RobotItem for the discovered robot, connect signals, and add to the combo box
+        profile = RobotProfile(hostname=hostname, port=self.dns_worker.port)
+        robot_item = RobotItem(name=hostname, profile = profile)
+        robot_item.connect_robot.connect(self._on_robot_selected)
+        robot_item.remove_robot.connect(self._on_device_removed)
+        
+        self.title_bar.robot_combo.add_robot(robot_item)
+        # self.title_bar.robot_combo.addItem(hostname)
+        self._known_robots[hostname] = profile
+    
+    def _on_device_removed(self, hostname: str):
+        
+        self.title_bar.robot_combo.remove_robot(hostname)
+        self._known_robots.pop(hostname, None)
+
         
     def _on_robot_selected(self, hostname: str):
         
@@ -121,18 +145,18 @@ class MainWindow(QMainWindow):
         self._ros_thread.started.connect(lambda: self._ros_worker.connect(host=hostname, port=9090))
  
         # Wire bus_state -> RightPanel
-        self._ros_worker.bus_state_updated.connect(self.right_panel.refresh_devices)
+        self._ros_worker.bus_state_updated.connect(self.middle_section.right_panel.refresh_devices)
         
         #Now to Status_strip
-        self._ros_worker.bus_state_updated.connect(self.status_strip.update_bus)
-        self._ros_worker.battery_updated.connect(self.status_strip.update_battery)
-        self._ros_worker.cmd_vel_active.connect(self.status_strip.update_cmdvel)
+        self._ros_worker.bus_state_updated.connect(self.middle_section.status_strip.update_bus)
+        self._ros_worker.battery_updated.connect(self.middle_section.status_strip.update_battery)
+        self._ros_worker.cmd_vel_active.connect(self.middle_section.status_strip.update_cmdvel)
         
         #Connect the fault log
-        self._ros_worker.log_message.connect(self.fault_log.update_faults)
+        self._ros_worker.log_message.connect(self.bottom_section.fault_log.update_faults)
  
         # Wire velocity commands -> ROS publisher
-        self.control.velocity_command.connect(
+        self.bottom_section.control.velocity_command.connect(
             lambda velocity: self._ros_worker.publish_velocity(velocity))
  
         self._ros_thread.start()
@@ -165,44 +189,17 @@ class MainWindow(QMainWindow):
         #TODO: Figure out what to do with the wizard
         super().closeEvent(event)
 
-    def _on_device_found(self, hostname: str):
-        if hostname in self._known_robots:
-            return  # Already listed
-
-        # Remove the placeholder if this is the first real robot
-        if "No robots found" in [
-            self.robot_combo.itemText(i)
-            for i in range(self.robot_combo.count())
-        ]:
-            self.robot_combo.clear()
-            self._known_robots.clear()
-
-        self.robot_combo.addItem(hostname)
-        self._known_robots[hostname] = self.robot_combo.count() - 1
-
-    def _on_device_removed(self, hostname: str):
-        idx = self._known_robots.pop(hostname, None)
-        if idx is not None:
-            self.robot_combo.removeItem(idx)
-            # Rebuild index map after removal
-            self._known_robots = {
-                self.robot_combo.itemText(i): i
-                for i in range(self.robot_combo.count())
-            }
-
-        if self.robot_combo.count() == 0:
-            self.robot_combo.addItem("No robots found")
 
     def _set_status(self, connected: bool, label: str | None = None):
         if connected:
-            self.status_dot.setObjectName("StatusDotConnected")
-            self.status_label.setText(label or "connected")
+            self.title_bar.status_dot.setObjectName("StatusDotConnected")
+            self.title_bar.status_label.setText(label or "connected")
         else:
-            self.status_dot.setObjectName("StatusDotDisconnected")
-            self.status_label.setText(label or "disconnected")
+            self.title_bar.status_dot.setObjectName("StatusDotDisconnected")
+            self.title_bar.status_label.setText(label or "disconnected")
         # Force QSS re-evaluation after objectName change
-        self.status_dot.style().unpolish(self.status_dot)
-        self.status_dot.style().polish(self.status_dot)
+        self.title_bar.status_dot.style().unpolish(self.title_bar.status_dot)
+        self.title_bar.status_dot.style().polish(self.title_bar.status_dot)
 
 
     # ------------------------------------------------------------------ #

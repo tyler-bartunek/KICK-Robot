@@ -5,8 +5,10 @@ from pathlib import Path
 #PyQt Functionality
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout,
-    QLabel, QPushButton, QComboBox
+    QLabel, QPushButton, QComboBox, QToolButton, QMenu, QWidgetAction
 )
+from PyQt6.QtGui import QStandardItem
+from PyQt6.QtCore import pyqtSignal
 
 from connection import RobotProfileManager, RobotProfile
 
@@ -30,17 +32,11 @@ class TitleBar(QWidget):
         layout.addWidget(title)
         layout.addStretch()
         
-        # self.add_robot_button = QPushButton("Add Robot")
-        # self.add_robot_button.setObjectName("RobotWizardButton")
-        # self.add_robot_button.clicked.connect(self._on_robot_add_click)
-        # layout.addWidget(self.add_robot_button)
 
         # Robot selector — populated by discovery signals
-        self.robot_combo = QComboBox()
+        self.robot_combo = RobotSelector()
         self.robot_combo.setObjectName("RobotCombo")
         self.robot_combo.setMinimumWidth(180)
-        self.robot_combo.addItem("No robots found")
-        # self.robot_combo.currentTextChanged.connect(self._on_robot_selected)
         layout.addWidget(self.robot_combo)
 
         # Connection status dot + label
@@ -52,14 +48,84 @@ class TitleBar(QWidget):
         self.status_label.setObjectName("StatusLabel")
         layout.addWidget(self.status_label)
         
-    def add_robot_item(self, name:str, robot: RobotProfile) -> None:
-        """Add a robot to the combo box if it doesn't already exist."""
-        if name not in [self.robot_combo.itemText(i) for i in range(self.robot_combo.count())]:
-            self.robot_combo.addItem(name)
-        
     
-class RobotItem:
-    """A simple data structure to hold robot information for the combo box."""
-    def __init__(self, name:str, profile:RobotProfile):
+class RobotItem(QWidget):
+    
+    connect_robot = pyqtSignal(str)
+    remove_robot = pyqtSignal(str)
+    ssh_robot = pyqtSignal(str)
+    
+    """A simple data object to hold robot information for the combo box."""
+    def __init__(self, name:str, profile:RobotProfile, parent = None):
+        super().__init__(parent)
+        
+        self.layout = QHBoxLayout(self)
+        self.layout.setContentsMargins(0, 0, 0, 0)
         self.name = name
         self.profile = profile
+        
+        self.label = QLabel(name)
+        self.connect_button = QPushButton("Connect")
+        self.ssh_button = QPushButton("SSH")
+        self.remove_button = QPushButton("Remove")
+        
+        self.connect_button.clicked.connect(self._on_connect_clicked)
+        self.remove_button.clicked.connect(self._on_remove_clicked)
+        self.ssh_button.clicked.connect(self._on_ssh_clicked)
+        self.layout.addWidget(self.label)
+        self.layout.addWidget(self.connect_button)
+        self.layout.addWidget(self.ssh_button)
+        self.layout.addWidget(self.remove_button)
+        
+    def _on_connect_clicked(self):
+        """Emit a signal to connect to this robot."""
+        self.connect_robot.emit(self.name)
+        
+    def _on_ssh_clicked(self):
+        """Emit a signal to SSH into this robot."""
+        self.ssh_robot.emit(self.name)
+        
+    def _on_remove_clicked(self):
+        """Remove this robot from the list."""
+        self.setParent(None)
+        self.deleteLater()
+        self.remove_robot.emit(self.name)
+        
+        
+class RobotSelector(QToolButton):
+    """A custom QToolButton that acts as a dropdown menu for selecting robots."""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setText("Select Robot ▾")
+        self.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+
+        self.menu = QMenu(self)
+        self.setMenu(self.menu)
+        
+        self.count = 0
+
+        self._placeholder = self.menu.addAction("No robots found")
+        self._placeholder.setEnabled(False)
+
+    def add_robot(self, robot_item: "RobotItem"):
+        if self._placeholder is not None:
+            self.menu.removeAction(self._placeholder)
+            self._placeholder = None
+
+        action = QWidgetAction(self.menu)
+        action.setDefaultWidget(robot_item)
+        self.menu.addAction(action)
+        self.count += 1
+        
+    def remove_robot(self, robot_name: str):
+        for action in self.menu.actions():
+            widget = action.defaultWidget()
+            if isinstance(widget, RobotItem) and widget.name == robot_name:
+                self.menu.removeAction(action)
+                widget.setParent(None)
+                widget.deleteLater()
+                self.count -= 1
+                break
+            if self.count == 0:
+                self._placeholder = self.menu.addAction("No robots found")

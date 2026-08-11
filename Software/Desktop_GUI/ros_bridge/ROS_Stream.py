@@ -44,17 +44,17 @@ class ROS_StreamWorker(QObject):
         print("ROS connection established")
 
         # Subscribe to bus_state topic
-        self.bus_state_subscriber = roslibpy.Topic(self.client, 'kickbot/bus_state', 'kickbot_interfaces/msg/BusState')
-        self.bus_state_subscriber.subscribe(self._bus_state_callback)
+        # self.bus_state_subscriber = roslibpy.Topic(self.client, 'kickbot/bus_state', 'kickbot_interfaces/msg/BusState')
+        # self.bus_state_subscriber.subscribe(self._bus_state_callback)
         
-        #Subscribe to the battery topic
-        self.battery_subscriber = roslibpy.Topic(self.client, 'battery-info', 'kickbot_interfaces/msg/BatteryInfo')
+        # #Subscribe to the battery topic
+        # self.battery_subscriber = roslibpy.Topic(self.client, 'battery-info', 'kickbot_interfaces/msg/BatteryInfo')
         
-        # Set to publish to cmd_vel topic
-        self.cmd_vel_publisher = roslibpy.Topic(self.client, "kickbot/cmd_vel", 'geometry_msgs/Twist')
-        self.cmd_vel_publisher.advertise()
+        # # Set to publish to cmd_vel topic
+        # self.cmd_vel_publisher = roslibpy.Topic(self.client, "kickbot/cmd_vel", 'geometry_msgs/Twist')
+        # self.cmd_vel_publisher.advertise()
         
-        self.cmd_vel_active.emit(self.cmd_vel_publisher.is_advertised())
+        # self.cmd_vel_active.emit(self.cmd_vel_publisher.is_advertised())
         
     def _battery_callback(self, message):
         

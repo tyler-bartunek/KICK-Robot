@@ -27,8 +27,11 @@ class BottomSection(QHBoxLayout):
         bl_layout.setSpacing(14)
         self.fault_log = FaultLogWidget()
         bl_layout.addWidget(self.fault_log, stretch=1)
-        bl_layout.addWidget(OrientationWidget(), stretch=1)
-        bl_layout.addWidget(ControlWidget(), stretch=1)
+        
+        self.control = ControlWidget()
+        self.orientation = OrientationWidget()
+        bl_layout.addWidget(self.orientation, stretch=1)
+        bl_layout.addWidget(self.control, stretch=1)
 
         # # Bottom right: launch profile
         # bottom_right = QWidget()

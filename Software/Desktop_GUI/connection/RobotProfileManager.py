@@ -23,24 +23,24 @@ KEYRING_SERVICE = "kickbot_gui"
 @dataclass
 class RobotProfile:
     
-    alias:     str
     hostname:  str
-    username:  str
+    port:  int
     workspace: str = ""   # filled in after first successful connect + detect
 
     def display(self) -> str:
-        return f"{self.alias}  ({self.hostname})"
-
+        return f"{self.hostname}:{self.port}"
 
 class RobotProfileManager:
     """
-    Load, save, and retrieve robot connection profiles.
-    Passwords are never stored in the JSON file.
+    Manage the list of connected robots, including saving and loading settings from disk.
     """
 
     def __init__(self):
         self._path = self._config_path()
         self._profiles: list[RobotProfile] = self._load()
+        
+        self._ssh_connected = False
+        
 
     # ------------------------------------------------------------------
     # Public API
