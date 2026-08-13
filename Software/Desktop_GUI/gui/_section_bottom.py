@@ -33,13 +33,4 @@ class BottomSection(QHBoxLayout):
         bl_layout.addWidget(self.orientation, stretch=1)
         bl_layout.addWidget(self.control, stretch=1)
 
-        # # Bottom right: launch profile
-        # bottom_right = QWidget()
-        # bottom_right.setObjectName("BottomRightLaunch")
-        # bottom_right.setFixedWidth(190)
-        # br_layout = QVBoxLayout(bottom_right)
-        # br_layout.setContentsMargins(10, 8, 10, 8)
-        # br_layout.addWidget(LaunchPanel())
-
         self.addWidget(bottom_left, stretch=1)
-        # self.addWidget(bottom_right)

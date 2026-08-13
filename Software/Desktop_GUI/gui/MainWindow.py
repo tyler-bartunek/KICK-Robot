@@ -44,8 +44,7 @@ class MainWindow(QMainWindow):
         # Track known robots: hostname -> (QComboBox index)
         self._known_robots: dict[str, int] = {}
         self.profile_manager = RobotProfileManager()
-        self._ros_worker: ROS_StreamWorker | None = None
-        self._ros_thread: QThread | None = None
+        self._ros_threads: dict[str, QThread] | None = None
         self._dns_worker: DNSWorker | None = None
         self._dns_thread: QThread | None = None
 
@@ -100,17 +99,10 @@ class MainWindow(QMainWindow):
         if hostname in self._known_robots:
             return  # Already listed
 
-        # # Remove the placeholder if this is the first real robot
-        # if "No robots found" in [
-        #     self.title_bar.robot_combo.itemText(i)
-        #     for i in range(self.title_bar.robot_combo.count())
-        # ]:
-        #     self.title_bar.robot_combo.clear()
-        #     self._known_robots.clear()
-
         #Instantiate a RobotProfile and RobotItem for the discovered robot, connect signals, and add to the combo box
         profile = RobotProfile(hostname=hostname, port=self.dns_worker.port)
         robot_item = RobotItem(name=hostname, profile = profile)
+        self.profile_manager.add_or_update(profile, ROS_StreamWorker())
         robot_item.connect_robot.connect(self._on_robot_selected)
         robot_item.remove_robot.connect(self._on_device_removed)
         
@@ -122,6 +114,7 @@ class MainWindow(QMainWindow):
         
         self.title_bar.robot_combo.remove_robot(hostname)
         self._known_robots.pop(hostname, None)
+        self.profile_manager.remove(hostname)
 
         
     def _on_robot_selected(self, hostname: str):
@@ -131,45 +124,68 @@ class MainWindow(QMainWindow):
             self._teardown_ros_worker()
             return
  
+        #Set status flags
         self._set_status(connected=False, label="connecting…")
-        self._teardown_ros_worker()   # clean up any previous connection
+        self.profile_manager.change_focus(hostname)
+        
+        self._teardown_ros_worker(hostname)   # clean up any previous connection
         self._init_ros_worker(hostname)
  
     def _init_ros_worker(self, hostname: str):
         
-        self._ros_thread = QThread(self)
-        self._ros_worker = ROS_StreamWorker()
-        self._ros_worker.moveToThread(self._ros_thread)
+        self._ros_threads[hostname] = QThread(self)
+        ros_worker = self.profile_manager.get_bridge(hostname)
+        ros_worker.moveToThread(self._ros_threads[hostname])
  
         # Start connection when thread starts
-        self._ros_thread.started.connect(lambda: self._ros_worker.connect(host=hostname, port=9090))
+        self._ros_threads[hostname].started.connect(lambda: self._ros_worker.connect(host=hostname, port=9090))
  
         # Wire bus_state -> RightPanel
-        self._ros_worker.bus_state_updated.connect(self.middle_section.right_panel.refresh_devices)
+        ros_worker.bus_state_updated.connect(self.middle_section.right_panel.refresh_devices)
         
         #Now to Status_strip
-        self._ros_worker.bus_state_updated.connect(self.middle_section.status_strip.update_bus)
-        self._ros_worker.battery_updated.connect(self.middle_section.status_strip.update_battery)
-        self._ros_worker.cmd_vel_active.connect(self.middle_section.status_strip.update_cmdvel)
+        ros_worker.bus_state_updated.connect(self.middle_section.status_strip.update_bus)
+        ros_worker.battery_updated.connect(self.middle_section.status_strip.update_battery)
+        ros_worker.cmd_vel_active.connect(self.middle_section.status_strip.update_cmdvel)
         
         #Connect the fault log
-        self._ros_worker.log_message.connect(self.bottom_section.fault_log.update_faults)
+        ros_worker.log_message.connect(self.bottom_section.fault_log.update_faults)
  
         # Wire velocity commands -> ROS publisher
         self.bottom_section.control.velocity_command.connect(
-            lambda velocity: self._ros_worker.publish_velocity(velocity))
+            lambda velocity: ros_worker.publish_velocity(velocity))
  
-        self._ros_thread.start()
+        self._ros_threads[hostname].start()
         self._set_status(connected=True)
  
-    def _teardown_ros_worker(self):
-        if self._ros_worker is not None:
-            self._ros_worker.disconnect()
-        if self._ros_thread is not None:
-            self._ros_thread.quit()
-            self._ros_thread.wait()
-        self._ros_worker = None
-        self._ros_thread = None
+    def _teardown_ros_worker(self, hostname:str = None):
+        
+        try:
+            if hostname:
+                ros_worker = self.profile_manager.get_bridge(hostname)
+                ros_thread = self._ros_threads[hostname]
+                if ros_worker is not None:
+                    ros_worker.disconnect()
+                if ros_thread is not None:
+                    ros_thread.quit()
+                    ros_thread.wait()
+                    
+                #Remove the worker and thread objects from profile management 
+                self.profile_manager.pop(hostname)
+                self._ros_threads.pop(hostname)
+            
+            #If hostname not specified, close all workers and threads recursively 
+            else:
+                for p in self.profile_manager._profiles:
+                    self._teardown_ros_worker(p.hostname)
+                
+        except KeyError: #Ros worker not found at index, nothing to do
+            if self._ros_threads or self.profile_manager._bridges:
+                print(f"Could not find either specified worker or thread at {hostname}")
+            pass
+        
+        # self._ros_worker = None
+        # self._ros_thread = None
  
     # ------------------------------------------------------------------
     # Update closeEvent to also teardown ROS:

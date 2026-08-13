@@ -11,6 +11,9 @@ from pathlib import Path
 from dataclasses import dataclass, asdict
 from typing import Optional
 
+from ros_bridge import ROS_StreamWorker
+ 
+
 try:
     import keyring
     KEYRING_AVAILABLE = True
@@ -26,6 +29,12 @@ class RobotProfile:
     hostname:  str
     port:  int
     workspace: str = ""   # filled in after first successful connect + detect
+    ssh_enabled: bool = False
+    has_focus: bool = False
+    hardware_connection_points: Optional[dict[int, tuple[int, int]]] = None  # {module_id: (board_connection_point, offset from default for board_connection_point)}
+
+    if ssh_enabled:
+        ssh_username: str = "pi"
 
     def display(self) -> str:
         return f"{self.hostname}:{self.port}"
@@ -37,11 +46,9 @@ class RobotProfileManager:
 
     def __init__(self):
         self._path = self._config_path()
-        self._profiles: list[RobotProfile] = self._load()
+        self._bridges: dict[str, ROS_StreamWorker] = {} #TODO: Update load to also update this list
+        self._profiles: list[RobotProfile] = self._load_profiles()
         
-        self._ssh_connected = False
-        
-
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -51,26 +58,45 @@ class RobotProfileManager:
         return list(self._profiles)
 
     def add_or_update(self, profile: RobotProfile,
+                      ros_worker: ROS_StreamWorker,
                       password: str | None = None,
                       remember: bool = False):
         """
         Save or update a profile. If remember=True and password is given,
         store the password in the OS keychain.
         """
-        # Replace existing entry with same hostname
-        self._profiles = [p for p in self._profiles
-                          if p.hostname != profile.hostname]
-        self._profiles.append(profile)
+        
+        # self._profiles = [p for p in self._profiles
+        #                   if p.hostname != profile.hostname]
+        # self._profiles.append(profile)
+        
+        for p_idx, p in enumerate(self._profiles):
+            
+            # Replace existing entry with same hostname
+            if p.hostname != profile.hostname:
+                self._profiles[p_idx] = p
+                self._bridges[profile.hostname] = ros_worker
+                
+            self._profiles.append(profile)
         self._save()
 
-        if remember and password and KEYRING_AVAILABLE:
+        if remember and password and profile.ssh_enabled and KEYRING_AVAILABLE:
             keyring.set_password(KEYRING_SERVICE, profile.hostname, password)
+            
+    def change_focus(self, hostname: str) -> None:
+        
+        for p in self._profiles:
+            if p.hostname != hostname:
+                p.has_focus = False
+            else:
+                p.has_focus = True
 
     def remove(self, hostname: str):
         self._profiles = [p for p in self._profiles
                           if p.hostname != hostname]
+        self._bridges.pop(hostname) #Remove the stream_worker
         self._save()
-        if KEYRING_AVAILABLE:
+        if self._profiles[hostname].ssh_enabled and KEYRING_AVAILABLE:
             try:
                 keyring.delete_password(KEYRING_SERVICE, hostname)
             except Exception:
@@ -81,7 +107,10 @@ class RobotProfileManager:
         if not KEYRING_AVAILABLE:
             return None
         try:
-            return keyring.get_password(KEYRING_SERVICE, hostname)
+            if self._profiles[hostname].ssh_enabled:
+                return keyring.get_password(KEYRING_SERVICE, hostname)
+            else:
+                return None
         except Exception:
             return None
 
@@ -96,19 +125,34 @@ class RobotProfileManager:
     def get(self, hostname: str) -> RobotProfile | None:
         return next((p for p in self._profiles
                      if p.hostname == hostname), None)
+        
+    def get_bridge(self, hostname: str) -> ROS_StreamWorker:
+        
+        return self._bridges[hostname]
 
     # ------------------------------------------------------------------
     # Persistence
     # ------------------------------------------------------------------
 
-    def _load(self) -> list[RobotProfile]:
+    def _load_profiles(self) -> list[RobotProfile]:
         if not self._path.exists():
             return []
         try:
             data = json.loads(self._path.read_text(encoding="utf-8"))
-            return [RobotProfile(**d) for d in data]
+            #Ensure no robot has focus to start upon load
+            profiles = [RobotProfile(**d) for d in data]
+            for p in profiles:
+                p.has_focus = False
+            return profiles
         except Exception:
             return []
+        
+    def _load_ros_workers(self) -> dict[str, ROS_StreamWorker]:
+        
+        for p in self._profiles:
+            self._bridges[p.hostname] = ROS_StreamWorker()
+            self._bridges[p.hostname].connect()
+        
 
     def _save(self):
         self._path.parent.mkdir(parents=True, exist_ok=True)
