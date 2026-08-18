@@ -19,8 +19,6 @@ class DNSWorker(QObject):
         super().__init__(parent)
         self.zeroconf = Zeroconf()
         self.browser = None
-        self.discovered_robots = []
-        # self.robot_profile_manager = RobotProfileManager()
         
         #Start the discovery process when the DNSWorker is initialized.
         self.start_discovery()
@@ -34,7 +32,6 @@ class DNSWorker(QObject):
         #TODO: Implement the logic to handle service state updates
         service_state_behavior = {
             ServiceStateChange.Added: self.on_service_added,
-            ServiceStateChange.Removed: self.on_service_removed,
             ServiceStateChange.Updated: self.on_service_updated,
         }
         
@@ -45,20 +42,11 @@ class DNSWorker(QObject):
         info = self.zeroconf.get_service_info(service_type, name)
         if info:
             self.hostname = info.server
+            self.ip_address = info.parsed_addresses()[0]
             self.port = info.port
             
-            # robot_profile = RobotProfile(hostname=hostname, port=port)
-            # self.robot_profile_manager.add_robot(robot_profile)
-            # self.discovered_robots.append(robot_profile)
             print(f"Discovered robot: {self.hostname}:{self.port}")
             self.device_discovered.emit(self.hostname)  # Emit signal to notify that a new robot has been discovered
-        
-    def on_service_removed(self, service_type, name):
-        # This method is called when a service is removed from the network.
-        print(f"Service removed: {name}")
-        # Remove the robot from the discovered list and the profile manager
-        self.discovered_robots = [robot for robot in self.discovered_robots if robot.hostname != name]
-        self.robot_profile_manager.remove_robot(name)
         
     def on_service_updated(self, service_type, name):
         # This method is called when a service is updated on the network.

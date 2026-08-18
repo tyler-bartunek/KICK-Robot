@@ -28,6 +28,7 @@ class RobotProfile:
     
     hostname:  str
     port:  int
+    ip_address: str
     workspace: str = ""   # filled in after first successful connect + detect
     ssh_enabled: bool = False
     has_focus: bool = False
@@ -65,23 +66,15 @@ class RobotProfileManager:
         Save or update a profile. If remember=True and password is given,
         store the password in the OS keychain.
         """
-        
-        # self._profiles = [p for p in self._profiles
-        #                   if p.hostname != profile.hostname]
-        # self._profiles.append(profile)
-        
-        for p_idx, p in enumerate(self._profiles):
-            
-            # Replace existing entry with same hostname
-            if p.hostname != profile.hostname:
-                self._profiles[p_idx] = p
-                self._bridges[profile.hostname] = ros_worker
-                
-            self._profiles.append(profile)
+  
+        self._profiles = [p for p in self._profiles if p.hostname != profile.hostname]
+        self._profiles.append(profile)
+        self._bridges[profile.hostname] = ros_worker
         self._save()
 
         if remember and password and profile.ssh_enabled and KEYRING_AVAILABLE:
             keyring.set_password(KEYRING_SERVICE, profile.hostname, password)
+            self._save()
             
     def change_focus(self, hostname: str) -> None:
         
@@ -96,11 +89,12 @@ class RobotProfileManager:
                           if p.hostname != hostname]
         self._bridges.pop(hostname) #Remove the stream_worker
         self._save()
-        if self._profiles[hostname].ssh_enabled and KEYRING_AVAILABLE:
-            try:
-                keyring.delete_password(KEYRING_SERVICE, hostname)
-            except Exception:
-                pass
+        for p in self._profiles:
+            if self._profiles[hostname].ssh_enabled and KEYRING_AVAILABLE:
+                try:
+                    keyring.delete_password(KEYRING_SERVICE, hostname)
+                except Exception:
+                    pass
 
     def get_password(self, hostname: str) -> str | None:
         """Retrieve stored password from keychain, or None if not saved."""
@@ -129,6 +123,12 @@ class RobotProfileManager:
     def get_bridge(self, hostname: str) -> ROS_StreamWorker:
         
         return self._bridges[hostname]
+    
+    def get_address(self, hostname: str):
+        
+        for p in self._profiles:
+            if p.hostname == hostname:
+                return p.ip_address
 
     # ------------------------------------------------------------------
     # Persistence

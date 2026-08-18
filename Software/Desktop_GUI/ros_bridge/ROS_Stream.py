@@ -1,7 +1,8 @@
 
 from PyQt6.QtCore import QObject, pyqtSignal
 import roslibpy
-
+import socket
+from time import sleep
 
 _MODULE_TYPE_MAP: dict[int, str] = {
     0x00: "NA",   # Not applicable, no connection
@@ -15,9 +16,6 @@ _MODULE_TYPE_MAP: dict[int, str] = {
 def _hw_id_to_type(hw_id: int) -> str:
     return _MODULE_TYPE_MAP.get(hw_id, f"UNK({hw_id:#04x})")
 
-
-# How many bytes of device_data are allocated per device slot
-DEVICE_DATA_STRIDE = 4
 
 
 class ROS_StreamWorker(QObject):
@@ -39,22 +37,55 @@ class ROS_StreamWorker(QObject):
         self.cmd_vel_publisher = None
 
     def connect(self, host='localhost', port=9090):
+        
+        docker_started = False
+        
+        #Send trigger to get socket message to Pi side.
+        while not docker_started:
+            try:
+                docker_started = self._emit_docker_trigger(host, port)
+                
+            except ConnectionRefusedError:
+                print(f"Unable to connect to device {host}:{port}")
+                break
+            
+        
+        #Initialize the ROS client
         self.client = roslibpy.Ros(host=host, port=port)
         self.client.run()
         print("ROS connection established")
 
         # Subscribe to bus_state topic
-        # self.bus_state_subscriber = roslibpy.Topic(self.client, 'kickbot/bus_state', 'kickbot_interfaces/msg/BusState')
-        # self.bus_state_subscriber.subscribe(self._bus_state_callback)
+        #TODO: Define these messages on this side perhaps?
+        self.bus_state_subscriber = roslibpy.Topic(self.client, 'bus_state', 'kickbot_interfaces/msg/BusState')
+        self.bus_state_subscriber.subscribe(self._bus_state_callback)
         
-        # #Subscribe to the battery topic
-        # self.battery_subscriber = roslibpy.Topic(self.client, 'battery-info', 'kickbot_interfaces/msg/BatteryInfo')
+        #Subscribe to the battery topic
+        self.battery_subscriber = roslibpy.Topic(self.client, 'battery-info', 'kickbot_interfaces/msg/BatteryInfo')
         
-        # # Set to publish to cmd_vel topic
-        # self.cmd_vel_publisher = roslibpy.Topic(self.client, "kickbot/cmd_vel", 'geometry_msgs/Twist')
-        # self.cmd_vel_publisher.advertise()
+        # Set to publish to cmd_vel topic
+        self.cmd_vel_publisher = roslibpy.Topic(self.client, "kickbot/cmd_vel", 'geometry_msgs/Twist')
+        self.cmd_vel_publisher.advertise()
         
-        # self.cmd_vel_active.emit(self.cmd_vel_publisher.is_advertised())
+        self.cmd_vel_active.emit(self.cmd_vel_publisher.is_advertised())
+        
+    def _emit_docker_trigger(self, host='localhost', port = 9090) -> bool:
+        
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
+            
+            client.connect((host, port))
+            
+            start_signal = "START"
+            client.sendall(start_signal.encode('utf-8'))
+            
+            #Listen, see if we get the right response
+            if client.recv(1024) == b"STARTING":
+                print(f"Connecting to {host}:{port}, docker starting...")
+                sleep(30) #TODO: Implement logic to know that the docker container has actually started
+                return True
+            
+            return False
+            
         
     def _battery_callback(self, message):
         
@@ -68,7 +99,7 @@ class ROS_StreamWorker(QObject):
         Expected ROS message fields:
             active_devices : bool[6]  — True = slot occupied
             device_ids     : int[6]   — hardware ID per slot
-            device_data    : int[24]  — 4 bytes per device slot
+            voltage        : float    — voltage readout from ADC for battery monitoring
  
         Emitted list item format (matches RightPanel.refresh_devices):
             {
@@ -80,7 +111,7 @@ class ROS_StreamWorker(QObject):
         """
         active = message.get('active_devices', [False] * 6)
         ids    = message.get('device_ids',     [0]     * 6)
-        data   = message.get('device_data',    [0]     * 24)
+        voltage = message.get('voltage', 3.3)
  
         devices = []
         for slot in range(6):
@@ -88,8 +119,6 @@ class ROS_StreamWorker(QObject):
                 continue
  
             hw_id      = ids[slot]
-            offset     = slot * DEVICE_DATA_STRIDE
-            slot_bytes = data[offset : offset + DEVICE_DATA_STRIDE]
  
             # # Fault detection — adapt to your firmware's convention.
             # # Current assumption: byte 0 bit 0 = fault flag.
@@ -99,6 +128,7 @@ class ROS_StreamWorker(QObject):
                 "address":  f"0x{hw_id:02X}",
                 "position": str(slot),
                 "type":     _hw_id_to_type(hw_id),
+                "voltage": voltage
             })
  
         self.bus_state_updated.emit(devices)

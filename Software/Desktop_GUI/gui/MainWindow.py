@@ -44,7 +44,7 @@ class MainWindow(QMainWindow):
         # Track known robots: hostname -> (QComboBox index)
         self._known_robots: dict[str, int] = {}
         self.profile_manager = RobotProfileManager()
-        self._ros_threads: dict[str, QThread] | None = None
+        self._ros_threads: dict[str, QThread] = {}
         self._dns_worker: DNSWorker | None = None
         self._dns_thread: QThread | None = None
 
@@ -100,14 +100,13 @@ class MainWindow(QMainWindow):
             return  # Already listed
 
         #Instantiate a RobotProfile and RobotItem for the discovered robot, connect signals, and add to the combo box
-        profile = RobotProfile(hostname=hostname, port=self.dns_worker.port)
+        profile = RobotProfile(hostname=hostname, port=self.dns_worker.port, ip_address=self.dns_worker.ip_address)
         robot_item = RobotItem(name=hostname, profile = profile)
         self.profile_manager.add_or_update(profile, ROS_StreamWorker())
         robot_item.connect_robot.connect(self._on_robot_selected)
         robot_item.remove_robot.connect(self._on_device_removed)
         
         self.title_bar.robot_combo.add_robot(robot_item)
-        # self.title_bar.robot_combo.addItem(hostname)
         self._known_robots[hostname] = profile
     
     def _on_device_removed(self, hostname: str):
@@ -127,7 +126,6 @@ class MainWindow(QMainWindow):
         #Set status flags
         self._set_status(connected=False, label="connecting…")
         self.profile_manager.change_focus(hostname)
-        
         self._teardown_ros_worker(hostname)   # clean up any previous connection
         self._init_ros_worker(hostname)
  
@@ -138,7 +136,8 @@ class MainWindow(QMainWindow):
         ros_worker.moveToThread(self._ros_threads[hostname])
  
         # Start connection when thread starts
-        self._ros_threads[hostname].started.connect(lambda: self._ros_worker.connect(host=hostname, port=9090))
+        host = self.profile_manager.get_address(hostname)
+        self._ros_threads[hostname].started.connect(lambda: ros_worker.connect(host=host, port=9090))
  
         # Wire bus_state -> RightPanel
         ros_worker.bus_state_updated.connect(self.middle_section.right_panel.refresh_devices)
