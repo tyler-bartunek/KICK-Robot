@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (
     QLabel, QPushButton, QComboBox, QSizePolicy
 )
 from PyQt6.QtGui import QFont, QWindow
-from PyQt6.QtCore import QThread, Qt
+from PyQt6.QtCore import QThread, Qt, QThreadPool
 from PyQt6.QtCore import pyqtSignal as signal
 
 #Local imports: Titlebar and Toolbar
@@ -15,7 +15,7 @@ from gui._section_title_bar import TitleBar, RobotItem
 from gui._section_toolbar import Toolbar
 
 # Local imports: Device adding
-from connection import DNSWorker, RobotProfile, RobotProfileManager
+from connection import DNSWorker, RobotProfile, RobotProfileManager, RobotAvailabilityMonitor
 
 # Local imports: ROS worker
 from ros_bridge.ROS_Stream import ROS_StreamWorker #REMOVE
@@ -44,9 +44,10 @@ class MainWindow(QMainWindow):
         # Track known robots: hostname -> (QComboBox index)
         self._known_robots: dict[str, int] = {}
         self.profile_manager = RobotProfileManager()
+        self._connection_monitors: dict[str, RobotAvailabilityMonitor] = {}
         self._ros_threads: dict[str, QThread] = {}
         self._dns_worker: DNSWorker | None = None
-        self._dns_thread: QThread | None = None
+        self._dns_threads: QThread | None = None
 
         # Central widget + root layout
         self.central_widget = QWidget()
@@ -100,12 +101,21 @@ class MainWindow(QMainWindow):
             return  # Already listed
 
         #Instantiate a RobotProfile and RobotItem for the discovered robot, connect signals, and add to the combo box
-        profile = RobotProfile(hostname=hostname, port=self.dns_worker.port, ip_address=self.dns_worker.ip_address)
+        ip_address, port = self.dns_worker.device_info[hostname]['ip_address'], self.dns_worker.device_info[hostname]['port']
+        
+        #Temporary override for ROS, TODO: Find way to specify port
+        
+        profile = RobotProfile(hostname=hostname, port= 9090, ip_address= ip_address)
+        monitor = RobotAvailabilityMonitor(profile)
+        self._connection_monitors[hostname] = monitor
         robot_item = RobotItem(name=hostname, profile = profile)
         self.profile_manager.add_or_update(profile, ROS_StreamWorker())
+        
+        monitor.bridge_available.connect(lambda host, avail: robot_item.set_available(avail))
         robot_item.connect_robot.connect(self._on_robot_selected)
         robot_item.remove_robot.connect(self._on_device_removed)
         
+        monitor.start()
         self.title_bar.robot_combo.add_robot(robot_item)
         self._known_robots[hostname] = profile
     
@@ -125,6 +135,7 @@ class MainWindow(QMainWindow):
  
         #Set status flags
         self._set_status(connected=False, label="connecting…")
+        self.title_bar.robot_combo._placeholder = hostname
         self.profile_manager.change_focus(hostname)
         self._teardown_ros_worker(hostname)   # clean up any previous connection
         self._init_ros_worker(hostname)
@@ -185,6 +196,22 @@ class MainWindow(QMainWindow):
         
         # self._ros_worker = None
         # self._ros_thread = None
+        
+    def _teardown_monitoring(self, hostname:str = None):
+        
+        try:
+            if hostname:
+                self._connection_monitors[hostname].stop()
+                self._connection_monitors.pop(hostname)
+                
+            else:
+                for p in self.profile_manager._profiles:
+                    self._teardown_monitoring(p.hostname)
+                    
+        except KeyError:
+            if self._connection_monitors:
+                print(f"Could not find a connection monitoring thread matching for hostname {hostname}")
+            pass
  
     # ------------------------------------------------------------------
     # Update closeEvent to also teardown ROS:
@@ -198,9 +225,11 @@ class MainWindow(QMainWindow):
         self.dns_worker = None
         self._dns_thread = None
     
+    
     def closeEvent(self, event):
         self._teardown_ros_worker()
         self._teardown_dns_worker()
+        self._teardown_monitoring()
         #TODO: Figure out what to do with the wizard
         super().closeEvent(event)
 

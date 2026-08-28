@@ -53,7 +53,6 @@ class RobotItem(QWidget):
     
     connect_robot = pyqtSignal(str)
     remove_robot = pyqtSignal(str)
-    ssh_robot = pyqtSignal(str)
     
     """A simple data object to hold robot information for the combo box."""
     def __init__(self, name:str, profile:RobotProfile, parent = None):
@@ -66,24 +65,25 @@ class RobotItem(QWidget):
         
         self.label = QLabel(name)
         self.connect_button = QPushButton("Connect")
-        self.ssh_button = QPushButton("SSH")
         self.remove_button = QPushButton("Remove")
+        
+        self.connect_button.setVisible(False)
         
         self.connect_button.clicked.connect(self._on_connect_clicked)
         self.remove_button.clicked.connect(self._on_remove_clicked)
-        self.ssh_button.clicked.connect(self._on_ssh_clicked)
+        
         self.layout.addWidget(self.label)
         self.layout.addWidget(self.connect_button)
-        self.layout.addWidget(self.ssh_button)
         self.layout.addWidget(self.remove_button)
+        
+    def set_available(self, avail:bool):
+        
+        self.connect_button.setVisible(avail)
         
     def _on_connect_clicked(self):
         """Emit a signal to connect to this robot."""
         self.connect_robot.emit(self.name)
         
-    def _on_ssh_clicked(self):
-        """Emit a signal to SSH into this robot."""
-        self.ssh_robot.emit(self.name)
         
     def _on_remove_clicked(self):
         """Remove this robot from the list."""
@@ -129,3 +129,5 @@ class RobotSelector(QToolButton):
                 break
             if self.count == 0:
                 self._placeholder = self.menu.addAction("No robots found")
+                
+                

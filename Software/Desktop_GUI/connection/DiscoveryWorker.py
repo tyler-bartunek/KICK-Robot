@@ -3,8 +3,6 @@ from PyQt6.QtCore import QObject, pyqtSignal
 
 from zeroconf import Zeroconf, ServiceBrowser, ServiceStateChange
 
-from .RobotProfileManager import RobotProfileManager, RobotProfile
-
 
 class DNSWorker(QObject):
     
@@ -21,6 +19,7 @@ class DNSWorker(QObject):
         self.browser = None
         
         #Start the discovery process when the DNSWorker is initialized.
+        self.device_info:dict[str,dict] = {}
         self.start_discovery()
         
     def start_discovery(self):
@@ -40,13 +39,20 @@ class DNSWorker(QObject):
     def on_service_added(self, service_type, name):
         
         info = self.zeroconf.get_service_info(service_type, name)
+
         if info:
-            self.hostname = info.server
-            self.ip_address = info.parsed_addresses()[0]
-            self.port = info.port
+            # self.hostname = info.server
+            # self.ip_address = info.parsed_addresses()[0]
+            # self.port = info.port
             
-            print(f"Discovered robot: {self.hostname}:{self.port}")
-            self.device_discovered.emit(self.hostname)  # Emit signal to notify that a new robot has been discovered
+            #Use the hostname as the primary key
+            hostname = info.server
+            port = info.port
+            self.device_info[hostname] = {'ip_address': info.parsed_addresses()[0], 'port': info.port}
+            
+            print(f"Discovered robot: {hostname}:{port}")
+            self.device_discovered.emit(hostname)  # Emit signal to notify that a new robot has been discovered
+        
         
     def on_service_updated(self, service_type, name):
         # This method is called when a service is updated on the network.

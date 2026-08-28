@@ -14,14 +14,6 @@ from typing import Optional
 from ros_bridge import ROS_StreamWorker
  
 
-try:
-    import keyring
-    KEYRING_AVAILABLE = True
-except ImportError:
-    KEYRING_AVAILABLE = False
-
-KEYRING_SERVICE = "kickbot_gui"
-
 
 @dataclass
 class RobotProfile:
@@ -30,12 +22,9 @@ class RobotProfile:
     port:  int
     ip_address: str
     workspace: str = ""   # filled in after first successful connect + detect
-    ssh_enabled: bool = False
     has_focus: bool = False
-    hardware_connection_points: Optional[dict[int, tuple[int, int]]] = None  # {module_id: (board_connection_point, offset from default for board_connection_point)}
-
-    if ssh_enabled:
-        ssh_username: str = "pi"
+    bridge_available: bool = False
+    hardware_connection_points: Optional[dict[int, int]] = None  # {board_connection_point: offset from default for board_connection_point)}
 
     def display(self) -> str:
         return f"{self.hostname}:{self.port}"
@@ -59,9 +48,7 @@ class RobotProfileManager:
         return list(self._profiles)
 
     def add_or_update(self, profile: RobotProfile,
-                      ros_worker: ROS_StreamWorker,
-                      password: str | None = None,
-                      remember: bool = False):
+                      ros_worker: ROS_StreamWorker):
         """
         Save or update a profile. If remember=True and password is given,
         store the password in the OS keychain.
@@ -72,9 +59,6 @@ class RobotProfileManager:
         self._bridges[profile.hostname] = ros_worker
         self._save()
 
-        if remember and password and profile.ssh_enabled and KEYRING_AVAILABLE:
-            keyring.set_password(KEYRING_SERVICE, profile.hostname, password)
-            self._save()
             
     def change_focus(self, hostname: str) -> None:
         
@@ -89,24 +73,6 @@ class RobotProfileManager:
                           if p.hostname != hostname]
         self._bridges.pop(hostname) #Remove the stream_worker
         self._save()
-        for p in self._profiles:
-            if self._profiles[hostname].ssh_enabled and KEYRING_AVAILABLE:
-                try:
-                    keyring.delete_password(KEYRING_SERVICE, hostname)
-                except Exception:
-                    pass
-
-    def get_password(self, hostname: str) -> str | None:
-        """Retrieve stored password from keychain, or None if not saved."""
-        if not KEYRING_AVAILABLE:
-            return None
-        try:
-            if self._profiles[hostname].ssh_enabled:
-                return keyring.get_password(KEYRING_SERVICE, hostname)
-            else:
-                return None
-        except Exception:
-            return None
 
     def update_workspace(self, hostname: str, workspace: str):
         """Update workspace path after successful auto-detect."""
@@ -143,6 +109,7 @@ class RobotProfileManager:
             profiles = [RobotProfile(**d) for d in data]
             for p in profiles:
                 p.has_focus = False
+                p.bridge_available = False
             return profiles
         except Exception:
             return []

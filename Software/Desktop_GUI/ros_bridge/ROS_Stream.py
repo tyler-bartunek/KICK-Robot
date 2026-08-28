@@ -23,6 +23,7 @@ class ROS_StreamWorker(QObject):
     Manages the ROS connection and subscriptions, and emits signals to update the GUI.
     """
     # Define signals to communicate with the GUI
+    connection_failed = pyqtSignal(str)
     bus_state_updated = pyqtSignal(list)  # Emitted when a new bus state message is received
     battery_updated = pyqtSignal(float) #Emitted when a new battery state is received
     cmd_vel_active = pyqtSignal(bool) #Emitted when the cmd_vel publisher is advertised or unadvertised
@@ -38,17 +39,6 @@ class ROS_StreamWorker(QObject):
 
     def connect(self, host='localhost', port=9090):
         
-        docker_started = False
-        
-        #Send trigger to get socket message to Pi side.
-        while not docker_started:
-            try:
-                docker_started = self._emit_docker_trigger(host, port)
-                
-            except ConnectionRefusedError:
-                print(f"Unable to connect to device {host}:{port}")
-                break
-            
         
         #Initialize the ROS client
         self.client = roslibpy.Ros(host=host, port=port)
@@ -69,22 +59,6 @@ class ROS_StreamWorker(QObject):
         
         self.cmd_vel_active.emit(self.cmd_vel_publisher.is_advertised())
         
-    def _emit_docker_trigger(self, host='localhost', port = 9090) -> bool:
-        
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
-            
-            client.connect((host, port))
-            
-            start_signal = "START"
-            client.sendall(start_signal.encode('utf-8'))
-            
-            #Listen, see if we get the right response
-            if client.recv(1024) == b"STARTING":
-                print(f"Connecting to {host}:{port}, docker starting...")
-                sleep(30) #TODO: Implement logic to know that the docker container has actually started
-                return True
-            
-            return False
             
         
     def _battery_callback(self, message):
