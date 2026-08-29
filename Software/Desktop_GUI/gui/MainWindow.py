@@ -180,8 +180,7 @@ class MainWindow(QMainWindow):
                     ros_thread.quit()
                     ros_thread.wait()
                     
-                #Remove the worker and thread objects from profile management 
-                self.profile_manager.pop(hostname)
+                #Remove the thread object from profile management 
                 self._ros_threads.pop(hostname)
             
             #If hostname not specified, close all workers and threads recursively 
@@ -194,8 +193,7 @@ class MainWindow(QMainWindow):
                 print(f"Could not find either specified worker or thread at {hostname}")
             pass
         
-        # self._ros_worker = None
-        # self._ros_thread = None
+
         
     def _teardown_monitoring(self, hostname:str = None):
         

@@ -26,6 +26,7 @@ class ROS_StreamWorker(QObject):
     connection_failed = pyqtSignal(str)
     bus_state_updated = pyqtSignal(list)  # Emitted when a new bus state message is received
     battery_updated = pyqtSignal(float) #Emitted when a new battery state is received
+    last_vel_updated = pyqtSignal(dict)
     cmd_vel_active = pyqtSignal(bool) #Emitted when the cmd_vel publisher is advertised or unadvertised
     log_message = pyqtSignal(str) #Emitted for logging messages to the GUI
 
@@ -45,35 +46,28 @@ class ROS_StreamWorker(QObject):
         self.client.run()
         print("ROS connection established")
 
-        # Subscribe to bus_state topic
+        # Subscribe to bot_state topic
         #TODO: Define these messages on this side perhaps?
-        self.bus_state_subscriber = roslibpy.Topic(self.client, 'bus_state', 'kickbot_interfaces/msg/BusState')
-        self.bus_state_subscriber.subscribe(self._bus_state_callback)
-        
-        #Subscribe to the battery topic
-        self.battery_subscriber = roslibpy.Topic(self.client, 'battery-info', 'kickbot_interfaces/msg/BatteryInfo')
+        self.bot_state_subscriber = roslibpy.Topic(self.client, 'bot_state', 'kickbot_interfaces/msg/BotState')
+        self.bot_state_subscriber.subscribe(self._bot_state_callback)
         
         # Set to publish to cmd_vel topic
         self.cmd_vel_publisher = roslibpy.Topic(self.client, "kickbot/cmd_vel", 'geometry_msgs/Twist')
         self.cmd_vel_publisher.advertise()
         
-        self.cmd_vel_active.emit(self.cmd_vel_publisher.is_advertised())
-        
-            
-        
-    def _battery_callback(self, message):
-        
-        self.battery_updated.emit(message)
+        self.cmd_vel_active.emit(self.cmd_vel_publisher.is_advertised)
         
 
-    def _bus_state_callback(self, message: dict):
+    def _bot_state_callback(self, message: dict):
         """
-        Parse BusState and emit bus_state_updated(list[dict]).
+        Parse BotState and emit bot_state_updated(list[dict]).
  
         Expected ROS message fields:
             active_devices : bool[6]  — True = slot occupied
             device_ids     : int[6]   — hardware ID per slot
             voltage        : float    — voltage readout from ADC for battery monitoring
+            linear_vel     : float[3] — linear velocity (x, y, z)
+            angular_vel    : float[3] — angular velocity (x, y, z)
  
         Emitted list item format (matches RightPanel.refresh_devices):
             {
@@ -86,6 +80,14 @@ class ROS_StreamWorker(QObject):
         active = message.get('active_devices', [False] * 6)
         ids    = message.get('device_ids',     [0]     * 6)
         voltage = message.get('voltage', 3.3)
+        
+        directions = ['x', 'y', 'z']
+        vel_type = ['linear', 'angular']
+        vel_default = {vel:{basis:0.0 for basis in directions} for vel in vel_type}
+        velocity = message.get('velocity', vel_default)
+        
+        self.battery_updated.emit(voltage)
+        self.last_vel_updated.emit(velocity)
  
         devices = []
         for slot in range(6):
@@ -102,7 +104,6 @@ class ROS_StreamWorker(QObject):
                 "address":  f"0x{hw_id:02X}",
                 "position": str(slot),
                 "type":     _hw_id_to_type(hw_id),
-                "voltage": voltage
             })
  
         self.bus_state_updated.emit(devices)
@@ -114,8 +115,8 @@ class ROS_StreamWorker(QObject):
         
     def disconnect(self):
         """Clean shutdown — unsubscribe, unadvertise, close connection."""
-        if self.bus_state_subscriber:
-            self.bus_state_subscriber.unsubscribe()
+        if self.bot_state_subscriber:
+            self.bot_state_subscriber.unsubscribe()
         if self.cmd_vel_publisher:
             self.cmd_vel_publisher.unadvertise()
         if self.client and self.client.is_connected:

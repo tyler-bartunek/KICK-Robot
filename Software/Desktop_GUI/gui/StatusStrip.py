@@ -27,36 +27,47 @@ class _BatteryCard(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("StatCard")
+        
         self._percent = 0.0
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 5, 10, 5)
         layout.setSpacing(2)
+        
         top_row = QHBoxLayout()
         top_row.setContentsMargins(0, 0, 0, 0)
         self._label = QLabel("battery")
+        
         self._label.setObjectName("StatCardLabel")
         self._pct = QLabel("---")
         self._pct.setObjectName("StatCardValue_ok")
         self._pct.setAlignment(Qt.AlignmentFlag.AlignRight)
+        
         top_row.addWidget(self._label)
         top_row.addStretch()
         top_row.addWidget(self._pct)
+        
         self._bar_bg = QWidget()
         self._bar_bg.setObjectName("BatBarBg")
         self._bar_bg.setFixedHeight(5)
+        
         self._bar_fill = QWidget(self._bar_bg)
         self._bar_fill.setObjectName("BatBarFill")
         self._bar_fill.setFixedHeight(5)
+        
         self._voltage = QLabel("--- V avg")
         self._voltage.setObjectName("StatCardLabel")
+        
         layout.addLayout(top_row)
         layout.addWidget(self._bar_bg)
         layout.addWidget(self._voltage)
 
     def set_battery(self, voltage: float):
-        self._percent = voltage / 16.8
+        
+        self._percent = voltage / 3.3
+        
         self._pct.setText(f"{self._percent:.0f}%")
         self._voltage.setText(f"{voltage:.2f} V avg")
+        
         self._update_fill()
         state = "ok" if self._percent > 40 else ("warn" if self._percent > 20 else "error")
         self._pct.setObjectName(f"StatCardValue_{state}")
