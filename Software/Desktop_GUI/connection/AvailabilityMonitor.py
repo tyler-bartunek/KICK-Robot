@@ -23,13 +23,14 @@ class RobotAvailabilityMonitor(QObject):
 
     def track_availability(self, fast_interval=0.5, slow_interval=7.0, warmup=2.0):
         was_available = False
-        print("Tracking availability")
-        while True:  # tracking-lifetime condition still TBD, per earlier
+        self.profile.bridge_available = True  # Assume available until proven otherwise
+        
+        while self.profile.bridge_available:  # tracking-lifetime condition still TBD, per earlier
             try:
                 with socket.create_connection((self.profile.ip_address, self.profile.port), timeout=1):
                     if not was_available:
                         sleep(warmup)
-                        print("Device available")
+                        # print("Device available")
                         was_available = True
                         self.profile.bridge_available = True
                         self.bridge_available.emit(self.profile.hostname, True)
@@ -42,5 +43,6 @@ class RobotAvailabilityMonitor(QObject):
                 sleep(fast_interval)
                 
     def stop(self):
+        self.profile.bridge_available = False
         self._thread.quit()
         self._thread.wait()

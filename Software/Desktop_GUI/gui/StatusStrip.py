@@ -92,11 +92,10 @@ class StatusStrip(QWidget):
         layout.setContentsMargins(12, 0, 12, 0)
         layout.setSpacing(6)
         self._bus     = _StatCard("bus devices", "0/6")
-        self._faults  = _StatCard("faults", "---")
         self._cmdvel  = _StatCard("cmd_vel", "inactive")
         self._loop    = _StatCard("loop", "--- Hz")
         self._battery = _BatteryCard()
-        for card in (self._bus, self._faults, self._cmdvel, self._loop):
+        for card in (self._bus, self._cmdvel, self._loop):
             layout.addWidget(card, stretch=1)
         layout.addWidget(self._battery, stretch=1)
 
@@ -104,9 +103,6 @@ class StatusStrip(QWidget):
         connected = len(devices)
         self._bus.set_value(f"{connected} / {6}",
                             "ok" if ((connected <= 6) and (connected > 0)) else "warn")
-
-    def update_faults(self, count: int):
-        self._faults.set_value(str(count), "normal" if count == 0 else "warn")
 
     def update_cmdvel(self, publishing: bool):
         self._cmdvel.set_value("publishing" if publishing else "inactive",

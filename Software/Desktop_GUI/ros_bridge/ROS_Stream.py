@@ -1,9 +1,9 @@
 
 from PyQt6.QtCore import QObject, pyqtSignal
 import roslibpy
-import socket
-from time import sleep
 
+#Import utility to time how fast bot state messages are coming in
+from time import perf_counter
 
 _MODULE_TYPE_MAP: dict[int, str] = {
     0x00: "NA",   # Not applicable, no connection
@@ -26,7 +26,9 @@ class ROS_StreamWorker(QObject):
     # Define signals to communicate with the GUI
     connection_failed = pyqtSignal(str)
     connection_lost = pyqtSignal(str)
+    
     bot_state_updated = pyqtSignal(list)  # Emitted when a new bot state message is received
+    message_speed = pyqtSignal(float)  # Emitted to indicate the speed of incoming messages
     battery_updated = pyqtSignal(float) #Emitted when a new battery state is received
     last_vel_updated = pyqtSignal(dict)
     cmd_vel_active = pyqtSignal(bool) #Emitted when the cmd_vel publisher is advertised or unadvertised
@@ -49,9 +51,9 @@ class ROS_StreamWorker(QObject):
         print("ROS connection established")
 
         # Subscribe to bot_state topic
-        #TODO: Define these messages on this side perhaps?
         self.bot_state_subscriber = roslibpy.Topic(self.client, '/bot_state', 'kickbot_interfaces/msg/BotState')
         self.bot_state_subscriber.subscribe(self._bot_state_callback)
+        self.receive_time = perf_counter()  # Initialize the receive time for bot_state messages
         
         #Subscribe to the rosout topic for FaultLog widget
         self.rosout_subscriber = roslibpy.Topic(self.client, '/rosout', 'rcl_interfaces/msg/Log')
@@ -82,7 +84,9 @@ class ROS_StreamWorker(QObject):
                 "fault":    bool,
             }
         """
-        active = message.get('active_devices', [False] * 6)
+        self.message_speed.emit( 1.0 / (perf_counter() - self.receive_time) )  # Calculate and emit the message speed in Hz
+        
+        active = message.get('active_paths', [False] * 6)
         ids    = message.get('device_ids',     [0]     * 6)
         voltage = message.get('voltage', 3.3)
         
@@ -91,8 +95,10 @@ class ROS_StreamWorker(QObject):
         vel_default = {vel:{basis:0.0 for basis in directions} for vel in vel_type}
         velocity = message.get('velocity', vel_default)
         
+        # print("Emitting voltage and velocity updates")
         self.battery_updated.emit(voltage)
         self.last_vel_updated.emit(velocity)
+        
  
         devices = []
         for slot in range(6):
@@ -101,10 +107,6 @@ class ROS_StreamWorker(QObject):
  
             hw_id      = ids[slot]
  
-            # # Fault detection — adapt to your firmware's convention.
-            # # Current assumption: byte 0 bit 0 = fault flag.
-            # fault = bool(slot_bytes[0] & 0x01) if slot_bytes else False
- 
             devices.append({
                 "address":  f"0x{hw_id:02X}",
                 "position": str(slot),
@@ -112,6 +114,7 @@ class ROS_StreamWorker(QObject):
             })
  
         self.bot_state_updated.emit(devices)
+        self.receive_time = perf_counter()  # Update the receive time for bot_state messages
         
     def log_callback(self, message):
         """Callback function triggered every time a new log enters /rosout."""

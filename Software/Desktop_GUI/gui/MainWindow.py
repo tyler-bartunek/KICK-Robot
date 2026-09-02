@@ -3,8 +3,8 @@ from pathlib import Path
 
 #PyQt Functionality
 from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget,
-    QLabel, QPushButton, QComboBox, QSizePolicy
+    QMainWindow, QWidget, QVBoxLayout, QMessageBox,
+    QLabel, QPushButton, QSizePolicy
 )
 from PyQt6.QtGui import QFont, QWindow
 from PyQt6.QtCore import QThread, Qt, QThreadPool
@@ -117,6 +117,8 @@ class MainWindow(QMainWindow):
         robot_item.remove_robot.connect(self._on_device_removed)
         
         monitor.start()
+        if monitor.profile.bridge_available:
+            self.bottom_section.fault_log.update_faults(f"GUI: {hostname} at {ip_address} available to connect on port {9090}")
         self.title_bar.robot_combo.add_robot(robot_item)
         self._known_robots[hostname] = profile
     
@@ -158,6 +160,7 @@ class MainWindow(QMainWindow):
         
         #Now to Status_strip
         ros_worker.bot_state_updated.connect(self.middle_section.status_strip.update_bus)
+        ros_worker.message_speed.connect(self.middle_section.status_strip.update_loop)
         ros_worker.battery_updated.connect(self.middle_section.status_strip.update_battery)
         ros_worker.cmd_vel_active.connect(self.middle_section.status_strip.update_cmdvel)
         
@@ -232,11 +235,23 @@ class MainWindow(QMainWindow):
     
     
     def closeEvent(self, event):
-        self._teardown_ros_worker()
-        self._teardown_dns_worker()
-        self._teardown_monitoring()
-        #TODO: Figure out what to do with the wizard
-        super().closeEvent(event)
+        #Open a dialog to confirm exit, then teardown ROS and DNS workers
+        reply = QMessageBox.question(self, "Confirm Exit", "Are you sure you want to exit? This will disconnect from any connected robots.",
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                                     QMessageBox.StandardButton.No)
+        if reply == QMessageBox.StandardButton.No:
+            event.ignore()
+            return
+        else: #Clicked yes, proceed to teardown workers and close
+            
+            #Display a little message to the user that the application is closing via pop-up
+            QMessageBox.information(self, "Closing Application", "Closing the application. Disconnecting from all robots.")
+
+            self._teardown_ros_worker()
+            self._teardown_dns_worker()
+            self._teardown_monitoring()
+    
+            super().closeEvent(event)
 
 
     def _set_status(self, connected: bool, label: str | None = None):

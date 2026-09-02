@@ -52,6 +52,9 @@ class Toolbar(QMenuBar):
         
         edit_menu = self.addMenu("Edit")
         
+        robot_configs_action = QAction("Robot Settings", self)
+        edit_menu.addAction(robot_configs_action)
+        
         sensor_configs_action = QAction("Sensor Setting Files", self)
         
         #Add something to edit sensor config menu
