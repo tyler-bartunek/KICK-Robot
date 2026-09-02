@@ -1,7 +1,7 @@
 
 from PyQt6.QtCore import QObject, pyqtSignal, QThread
 
-from time import monotonic, sleep
+from time import sleep
 import socket
 
 from .RobotProfileManager import RobotProfileManager, RobotProfile

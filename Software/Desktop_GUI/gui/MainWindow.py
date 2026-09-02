@@ -93,6 +93,7 @@ class MainWindow(QMainWindow):
         self.dns_worker.moveToThread(self._dns_thread)
         self._dns_thread.start()
         self.dns_worker.start_discovery()
+        self.dns_worker.device_discovered.connect(self.bottom_section.fault_log.update_faults)
         self.dns_worker.device_discovered.connect(self._on_device_found)
         
     def _on_device_found(self, hostname: str):
@@ -138,6 +139,7 @@ class MainWindow(QMainWindow):
         self.title_bar.robot_combo._placeholder = hostname
         self.profile_manager.change_focus(hostname)
         self._teardown_ros_worker(hostname)   # clean up any previous connection
+        self.bottom_section.fault_log.update_faults(f"GUI: Attempting connection to {hostname}")
         self._init_ros_worker(hostname)
  
     def _init_ros_worker(self, hostname: str):
@@ -149,17 +151,22 @@ class MainWindow(QMainWindow):
         # Start connection when thread starts
         host = self.profile_manager.get_address(hostname)
         self._ros_threads[hostname].started.connect(lambda: ros_worker.connect(host=host, port=9090))
+        self.bottom_section.fault_log.update_faults(f"GUI: Connection established, wiring signals")
  
         # Wire bus_state -> RightPanel
-        ros_worker.bus_state_updated.connect(self.middle_section.right_panel.refresh_devices)
+        ros_worker.bot_state_updated.connect(self.middle_section.right_panel.refresh_devices)
         
         #Now to Status_strip
-        ros_worker.bus_state_updated.connect(self.middle_section.status_strip.update_bus)
+        ros_worker.bot_state_updated.connect(self.middle_section.status_strip.update_bus)
         ros_worker.battery_updated.connect(self.middle_section.status_strip.update_battery)
         ros_worker.cmd_vel_active.connect(self.middle_section.status_strip.update_cmdvel)
         
         #Connect the fault log
         ros_worker.log_message.connect(self.bottom_section.fault_log.update_faults)
+        ros_worker.connection_failed.connect(
+                    lambda reason: self.fault_log.update_faults(f"Pi: {reason}", level="error"))
+        ros_worker.connection_lost.connect(
+                    lambda reason: self.fault_log.update_faults(f"Pi: {reason}", level="error"))
  
         # Wire velocity commands -> ROS publisher
         self.bottom_section.control.velocity_command.connect(

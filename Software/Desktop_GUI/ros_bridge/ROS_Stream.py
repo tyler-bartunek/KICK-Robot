@@ -4,6 +4,7 @@ import roslibpy
 import socket
 from time import sleep
 
+
 _MODULE_TYPE_MAP: dict[int, str] = {
     0x00: "NA",   # Not applicable, no connection
     0x01: "ECH",  # Echo- Debug case
@@ -24,22 +25,23 @@ class ROS_StreamWorker(QObject):
     """
     # Define signals to communicate with the GUI
     connection_failed = pyqtSignal(str)
-    bus_state_updated = pyqtSignal(list)  # Emitted when a new bus state message is received
+    connection_lost = pyqtSignal(str)
+    bot_state_updated = pyqtSignal(list)  # Emitted when a new bot state message is received
     battery_updated = pyqtSignal(float) #Emitted when a new battery state is received
     last_vel_updated = pyqtSignal(dict)
     cmd_vel_active = pyqtSignal(bool) #Emitted when the cmd_vel publisher is advertised or unadvertised
-    log_message = pyqtSignal(str) #Emitted for logging messages to the GUI
+    
+    log_message = pyqtSignal(str, str) #Emitted for logging messages to the GUI
 
     def __init__(self, parent=None):
         
         super().__init__(parent)
         self.client = None
-        self.battery_subscriber = None
-        self.bus_state_subscriber = None
+        self.bot_state_subscriber = None
+        self.rosout_subscriber = None
         self.cmd_vel_publisher = None
 
     def connect(self, host='localhost', port=9090):
-        
         
         #Initialize the ROS client
         self.client = roslibpy.Ros(host=host, port=port)
@@ -48,11 +50,15 @@ class ROS_StreamWorker(QObject):
 
         # Subscribe to bot_state topic
         #TODO: Define these messages on this side perhaps?
-        self.bot_state_subscriber = roslibpy.Topic(self.client, 'bot_state', 'kickbot_interfaces/msg/BotState')
+        self.bot_state_subscriber = roslibpy.Topic(self.client, '/bot_state', 'kickbot_interfaces/msg/BotState')
         self.bot_state_subscriber.subscribe(self._bot_state_callback)
         
+        #Subscribe to the rosout topic for FaultLog widget
+        self.rosout_subscriber = roslibpy.Topic(self.client, '/rosout', 'rcl_interfaces/msg/Log')
+        self.rosout_subscriber.subscribe(self.log_callback)
+        
         # Set to publish to cmd_vel topic
-        self.cmd_vel_publisher = roslibpy.Topic(self.client, "kickbot/cmd_vel", 'geometry_msgs/Twist')
+        self.cmd_vel_publisher = roslibpy.Topic(self.client, "/cmd_vel", 'geometry_msgs/Twist')
         self.cmd_vel_publisher.advertise()
         
         self.cmd_vel_active.emit(self.cmd_vel_publisher.is_advertised)
@@ -66,8 +72,7 @@ class ROS_StreamWorker(QObject):
             active_devices : bool[6]  — True = slot occupied
             device_ids     : int[6]   — hardware ID per slot
             voltage        : float    — voltage readout from ADC for battery monitoring
-            linear_vel     : float[3] — linear velocity (x, y, z)
-            angular_vel    : float[3] — angular velocity (x, y, z)
+            velocity       : Twist    — estimated COM velocity of the robot
  
         Emitted list item format (matches RightPanel.refresh_devices):
             {
@@ -106,7 +111,19 @@ class ROS_StreamWorker(QObject):
                 "type":     _hw_id_to_type(hw_id),
             })
  
-        self.bus_state_updated.emit(devices)
+        self.bot_state_updated.emit(devices)
+        
+    def log_callback(self, message):
+        """Callback function triggered every time a new log enters /rosout."""
+        # Map numeric ROS 2 severity levels to readable strings
+        levels = {10: "DEBUG", 20: "INFO", 30: "WARN", 40: "ERROR", 50: "FATAL"}
+        
+        level_num = message.get('level', 0)
+        level_name = levels.get(level_num, f"UNKNOWN({level_num})")
+        node_name = message.get('name', 'unknown_node')
+        log_text = message.get('msg', '')
+    
+        self.log_message.emit(f"[{node_name}]: {log_text}", level_name)
         
     def _velocity_msg_callback(self, velocity:dict[str,dict[str,float]]):
         #Send the new velocity command to the device 

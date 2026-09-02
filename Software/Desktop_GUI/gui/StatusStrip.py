@@ -63,7 +63,7 @@ class _BatteryCard(QWidget):
 
     def set_battery(self, voltage: float):
         
-        self._percent = voltage / 3.3
+        self._percent = (voltage / 3.3) * 100.
         
         self._pct.setText(f"{self._percent:.0f}%")
         self._voltage.setText(f"{voltage:.2f} V avg")
