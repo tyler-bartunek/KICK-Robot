@@ -26,6 +26,7 @@ class ROS_StreamWorker(QObject):
     # Define signals to communicate with the GUI
     connection_failed = pyqtSignal(str)
     connection_lost = pyqtSignal(str)
+    request_disconnect = pyqtSignal(bool)
     
     bot_state_updated = pyqtSignal(list)  # Emitted when a new bot state message is received
     message_speed = pyqtSignal(float)  # Emitted to indicate the speed of incoming messages
@@ -102,7 +103,7 @@ class ROS_StreamWorker(QObject):
         self.battery_updated.emit(voltage)
         self.last_vel_updated.emit(velocity)
         self.compute_pose(velocity)  # Update the pose based on the received velocity
-        pose_simplified = [self.pose['linear']['x'], self.pose['linear']['y'], self.pose['angular']['z']]
+        pose_simplified = ([self.pose['linear']['x'], self.pose['linear']['y'], self.pose['angular']['z']])
         self.last_pose.emit(pose_simplified)  # Emit the simplified pose for GUI updates
  
         devices = []
@@ -140,28 +141,29 @@ class ROS_StreamWorker(QObject):
         """
         # Initialize pose if not already present
         if not hasattr(self, 'pose'):
-            pose = {vel: {basis: 0.0 for basis in ['x', 'y', 'z']} for vel in ['linear', 'angular']}
+            self.pose = {vel: {basis: 0.0 for basis in ['x', 'y', 'z']} for vel in ['linear', 'angular']}
         
         # Update pose based on velocity and time delta
         for vel_type in ['linear', 'angular']:
             for basis in ['x', 'y', 'z']:
-                pose[vel_type][basis] += velocity.get(vel_type, {}).get(basis, 0.0) * self.dt
+                self.pose[vel_type][basis] += velocity.get(vel_type, {}).get(basis, 0.0) * self.dt
 
     def _velocity_msg_callback(self, velocity:dict[str,dict[str,float]]):
         #Send the new velocity command to the device 
         self.cmd_vel_publisher.publish(velocity)
         
         
-    def disconnect(self):
+    def disconnect(self, confirm:bool):
         """Clean shutdown — unsubscribe, unadvertise, close connection."""
-        if self.bot_state_subscriber:
-            self.bot_state_subscriber.unsubscribe()
-        if self.rosout_subscriber:
-            self.rosout_subscriber.unsubscribe()
-        if self.cmd_vel_publisher:
-            self.cmd_vel_publisher.unadvertise()
-        if self.client and self.client.is_connected:
-            self.client.terminate()
-            self.client = None
+        if confirm:
+            if self.bot_state_subscriber:
+                self.bot_state_subscriber.unsubscribe()
+            if self.rosout_subscriber:
+                self.rosout_subscriber.unsubscribe()
+            if self.cmd_vel_publisher:
+                self.cmd_vel_publisher.unadvertise()
+            if self.client and self.client.is_connected:
+                self.client.terminate()
+                self.client = None
             
         

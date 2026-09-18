@@ -17,6 +17,8 @@ from gui._section_toolbar import Toolbar
 # Local imports: Device adding
 from connection import DNSWorker, RobotProfile, RobotProfileManager, RobotAvailabilityMonitor
 
+from planning import SessionManager, Session
+
 # Local imports: ROS worker
 from ros_bridge.ROS_Stream import ROS_StreamWorker #REMOVE
 
@@ -44,7 +46,9 @@ class MainWindow(QMainWindow):
         # Track known robots: hostname -> (QComboBox index)
         self._known_robots: dict[str, int] = {}
         self.profile_manager = RobotProfileManager()
+        self.control_session_manager = SessionManager()
         self._connection_monitors: dict[str, RobotAvailabilityMonitor] = {}
+        self.monitor_threads: dict[str, QThread] = {}
         self._ros_threads: dict[str, QThread] = {}
         self._dns_worker: DNSWorker | None = None
         self._dns_threads: QThread | None = None
@@ -108,7 +112,10 @@ class MainWindow(QMainWindow):
         
         profile = RobotProfile(hostname=hostname, port= 9090, ip_address= ip_address)
         monitor = RobotAvailabilityMonitor(profile)
-        self._connection_monitors[hostname] = monitor
+        self.monitor_threads[hostname] = QThread()
+        monitor.moveToThread(self.monitor_threads[hostname])
+        
+        
         robot_item = RobotItem(name=hostname, profile = profile)
         self.profile_manager.add_or_update(profile, ROS_StreamWorker())
         
@@ -117,7 +124,11 @@ class MainWindow(QMainWindow):
         robot_item.disconnect_robot.connect(self._on_robot_disconnect)
         robot_item.remove_robot.connect(self._on_device_removed)
         
-        monitor.start()
+        self.monitor_threads[hostname].start()
+        self.monitor_threads[hostname].started.connect(monitor.track_availability)
+        self._connection_monitors[hostname] = monitor
+        
+
         if monitor.profile.bridge_available:
             self.bottom_section.fault_log.update_faults(f"GUI: {hostname} at {ip_address} available to connect on port {9090}")
         self.title_bar.robot_combo.add_robot(robot_item)
@@ -181,6 +192,9 @@ class MainWindow(QMainWindow):
         host = self.profile_manager.get_address(hostname)
         self._ros_threads[hostname].started.connect(lambda: ros_worker.connect(host=host, port=9090))
         self.bottom_section.fault_log.update_faults(f"GUI: Connection established, wiring signals")
+        
+        #Start the control session
+        session = Session(hostname, ros_worker)
  
         # Wire bus_state -> RightPanel
         ros_worker.bot_state_updated.connect(self.middle_section.right_panel.refresh_devices)
@@ -201,12 +215,11 @@ class MainWindow(QMainWindow):
         ros_worker.connection_lost.connect(
                     lambda reason: self.fault_log.update_faults(f"Pi: {reason}", level="error"))
  
-        # Wire velocity commands -> ROS publisher
-        # TODO: Revise to use the planner session manager to handle velocity commands,rather than going through the control widget. 
-        # This allows for users to have more granular control of the device with focus, while still allowing the planner to send 
-        # velocity commands to devices that don't have focus. 
-        self.bottom_section.control.velocity_command.connect(
-            lambda velocity: ros_worker.publish_velocity(velocity))
+        # Wire velocity commands -> ROS publisher 
+        self.bottom_section.control.control_mode.connect(session.assign_planner)
+        
+        #Wire the disconnect signal
+        ros_worker.request_disconnect.connect(ros_worker.disconnect, Qt.ConnectionType.BlockingQueuedConnection)
  
         self._ros_threads[hostname].start()
         self._set_status(connected=True)
@@ -263,7 +276,8 @@ class MainWindow(QMainWindow):
                 ros_worker = self.profile_manager.get_bridge(hostname)
                 ros_thread = self._ros_threads[hostname]
                 if ros_worker is not None:
-                    ros_worker.disconnect()
+                    #TODO: Replace with a pyqt signal that calls disconnect
+                    ros_worker.request_disconnect.emit(True)
                     try: #Try disconnecting, ignore errors that come from signals already being disconnected
                         self.disconnect_signals_on_focus_change(hostname)
                     except Exception:
@@ -273,7 +287,6 @@ class MainWindow(QMainWindow):
                     ros_thread.wait()
                     
                 #Remove the thread object from the local dictionary of threads, move the ros_worker to the main thread, and remove the ros_worker from the profile_manager's bridges dictionary
-                ros_worker.moveToThread(QApplication.instance().thread())
                 self.profile_manager._bridges.pop(hostname, None)
                 self._ros_threads.pop(hostname, None)
             
@@ -293,7 +306,8 @@ class MainWindow(QMainWindow):
         
         try:
             if hostname:
-                self._connection_monitors[hostname].stop()
+                thread = self.monitor_threads[hostname]
+                self._connection_monitors[hostname].request_shutdown.emit(thread, True)
                 self._connection_monitors.pop(hostname)
                 
             else:

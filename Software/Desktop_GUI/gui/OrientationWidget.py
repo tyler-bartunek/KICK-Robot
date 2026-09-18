@@ -124,13 +124,15 @@ class OrientationWidget(QWidget):
 
     def _on_zero(self):
         self.zeroed.emit()
-        self.update_pose(0.0, 0.0, 0.0)
+        self.update_pose((0.0, 0.0, 0.0))
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
-    def update_pose(self, x: float, y: float, yaw_deg: float):
+    def update_pose(self, new_pose:tuple[float]):
+        x, y, yaw_rad = new_pose[0], new_pose[1], new_pose[2]
+        yaw_deg = yaw_rad * 180 / 3.1415
         self._canvas.set_yaw(yaw_deg)
         self._yaw_lbl["value"].setText(f"{yaw_deg:.1f}°")
         self._x_lbl["value"].setText(f"{x:.2f} m")

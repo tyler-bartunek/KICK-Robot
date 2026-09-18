@@ -13,8 +13,7 @@ class ControlWidget(QWidget):
     Keyboard arrow keys are captured at window level and forwarded here.
     """
 
-    # Emitted on every state change: (vx, vy, omega)
-    velocity_command = pyqtSignal(dict)
+    control_mode = pyqtSignal(str)
     
     CONTROL_MODES = {"Manual":Manual_Control}
 
@@ -62,6 +61,7 @@ class ControlWidget(QWidget):
     def build_widget_from_selection(self) -> QWidget:
         
         mode = self.control_selector.currentText()
+        self.control_mode.emit(mode)
         control_widget = self.CONTROL_MODES[mode](self)
         
         return control_widget

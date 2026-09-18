@@ -1,9 +1,15 @@
 
 
-from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtCore import QObject
 
 from connection import RobotProfileManager
 from ros_bridge import ROS_StreamWorker
+
+
+from .Planner import Planner
+from .manual import Manual_Control
+
+widget_types = {'manual':Manual_Control}
 
 
 class Session(QObject):
@@ -18,19 +24,31 @@ class Session(QObject):
     def __init__(self, hostname: str, bridge:ROS_StreamWorker, parent=None):
         self.name = hostname
         self.ros_bridge = bridge # This will be set when the ROS bridge is connected
-        self.planner = None  # This will be set when the planner is initialized
+        self.planner:Planner = None  # This will be set when the planner is initialized
         
-    def assign_planner(self):
+    def assign_planner(self, type:str):
         
-        pass
+        self.planner = widget_types[type].planner
+        self.planner.velocity_command.connect(lambda velocity: self.ros_bridge._velocity_msg_callback(velocity))
         
-        
+
+
 class SessionManager:
     
     def __init__(self):
         
-        self._sessions: list[Session] = None
+        self._sessions: list[Session] = []
         
-    def add_or_update(self, profile_manager:RobotProfileManager):
-        #Always called after updating the profile manager
-        self._sessions = [Session(p.hostname, p.bridge) for p in profile_manager]
+    def add_or_update(self, session:Session):
+        #Add the session if it isn't already in the list
+        self._sessions = [s for s in self._sessions if s.name != session.name]
+        self._sessions.append(session)
+        
+    def get_session(self, hostname:str):
+        
+        session_names = [s.name for s in self._sessions]
+        if hostname in session_names:
+            matching_sessions = [s for s in self._sessions if s.name == hostname]
+            return matching_sessions[0]
+        else:
+            pass #TODO: Decide if we want this to automatically make a session or throw an error

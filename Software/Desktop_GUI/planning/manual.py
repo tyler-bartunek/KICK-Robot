@@ -2,9 +2,10 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QButtonGroup
 )
-from PyQt6.QtCore import Qt, pyqtSignal
 
-from ._base import Session
+from PyQt6.QtCore import Qt as _Qt
+
+from .Planner import Planner
 
 
 class Manual_Control(QWidget):
@@ -13,19 +14,6 @@ class Manual_Control(QWidget):
     Keyboard arrow keys are captured at window level and forwarded here.
     """
 
-    # Emitted on every state change: (vx, vy, omega)
-    velocity_command = pyqtSignal(dict)
-    
-    ZERO_VEL = {"linear":{
-        "x":0.0,
-        "y":0.0,
-        "z":0.0},
-        "angular":{
-            "x":0.0,
-            "y":0.0,
-            "z":0.0}
-        }
-
     # Jog speed (m/s and rad/s) — tune per platform
     JOG_LINEAR  = 0.3
     JOG_ANGULAR = 0.5
@@ -33,9 +21,8 @@ class Manual_Control(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("ManualWidget")
-
-        self.velocity = {"linear":{"x":0.0, "y":0.0, "z":0.0}, 
-                         "angular":{"x":0.0, "y":0.0, "z":0.0}}
+        
+        self.planner = Planner()
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -71,12 +58,13 @@ class Manual_Control(QWidget):
             ["←",     "·",    "→"  ],
             [None,    "↓",    None ],
         ]
-        actions = {
-            "↑": ( self.JOG_LINEAR,  0,  0),
-            "↓": (-self.JOG_LINEAR,  0,  0),
-            "←": ( 0, -self.JOG_LINEAR,  0),
-            "→": ( 0,  self.JOG_LINEAR,  0),
-            "·": ( 0,  0,               0),
+        
+        self._dpad_actions = {
+            "↑": ('linear', 'y', self.JOG_LINEAR),
+            "↓": ('linear', 'y', -self.JOG_LINEAR),
+            "←": ('linear', 'x', -self.JOG_LINEAR),
+            "→": ('linear', 'x', self.JOG_LINEAR),
+            "·": self.planner.ZERO_VEL,
         }
 
         for row in rows:
@@ -93,9 +81,9 @@ class Manual_Control(QWidget):
                         "DPadStop" if cell == "·" else "DPadButton"
                     )
                     btn.setFixedSize(28, 28)
-                    vx, vy, om = actions[cell]
-                    btn.pressed.connect(lambda: self._send(self.velocity))
-                    btn.released.connect(lambda: self._send(self.ZERO_VEL))
+                    
+                    btn.pressed.connect(lambda c=cell: self._on_dpad_pressed(c))
+                    btn.released.connect(self._zero_and_send)
                     row_layout.addWidget(btn)
             grid_layout.addLayout(row_layout)
 
@@ -108,8 +96,6 @@ class Manual_Control(QWidget):
         self._vx_lbl    = self._vel_row("vx")
         self._vy_lbl    = self._vel_row("vy")
         self._omega_lbl = self._vel_row("omega")
-        
-        relevant_components = [self.velocity["linear"]["x"], self.velocity["linear"]["y"], self.velocity["angular"]["z"]]
 
         for entry in (self._vx_lbl, self._vy_lbl, self._omega_lbl):
             layout.addLayout(entry["layout"])
@@ -126,31 +112,67 @@ class Manual_Control(QWidget):
         layout.addWidget(k)
         layout.addWidget(v)
         return {"layout": layout, "value": v}
+    
+    def _on_dpad_pressed(self, cell):
+        if cell == "·":
+            self._zero_and_send()
+            return
+        vel_type, component, adjustment = self._dpad_actions[cell]
+        self.adjust_velocity(vel_type, component, adjustment)
+        self.send_vel(self.planner.velocity)
 
-    def _send(self, velocity):
+    def _on_dpad_released(self):
+        self._zero_and_send()
+        
+    def _zero_and_send(self):
+        
+        vel_types = ['linear','angular']
+        components = ['x', 'y', 'z']
+        for vel in vel_types:
+            for comp in components:
+                self.adjust_velocity(vel, comp, 0.0)
+        self.send_vel(self.planner.velocity)
+
+    def send_vel(self, velocity):
         vx, vy, omega = velocity["linear"]["x"], velocity["linear"]["y"], velocity["angular"]["z"]
         self._vx_lbl["value"].setText(f"{vx:.2f}")
         self._vy_lbl["value"].setText(f"{vy:.2f}")
         self._omega_lbl["value"].setText(f"{omega:.2f}")
-        self.velocity_command.emit(velocity)
+        self.planner._send()
 
     # ------------------------------------------------------------------
     # Call from MainWindow.keyPressEvent / keyReleaseEvent
     # ------------------------------------------------------------------
 
     def handle_key_press(self, key):
-        from PyQt6.QtCore import Qt as _Qt
+        
+        #R: clockwise
+        #E: CCW
+        
         mapping = {
-            _Qt.Key.Key_Up:    ( self.JOG_LINEAR, 0, 0),
-            _Qt.Key.Key_Down:  (-self.JOG_LINEAR, 0, 0),
-            _Qt.Key.Key_Left:  (0, -self.JOG_LINEAR, 0),
-            _Qt.Key.Key_Right: (0,  self.JOG_LINEAR, 0),
+            _Qt.Key.Key_Up:    ('linear', 'y', self.JOG_LINEAR),
+            _Qt.Key.Key_Down:  ('linear', 'y', -self.JOG_LINEAR),
+            _Qt.Key.Key_Left:  ('linear', 'x', -self.JOG_LINEAR),
+            _Qt.Key.Key_Right: ('linear', 'x', self.JOG_LINEAR),
+            _Qt.Key.Key_R: ('angular', 'z', -self.JOG_ANGULAR),
+            _Qt.Key.Key_E: ('angular', 'z', self.JOG_ANGULAR),
         }
         if key in mapping:
-            self._send(*mapping[key])
+            vel_type, component, adjustment = mapping[key]
+            self.adjust_velocity(vel_type, component, adjustment)
+            self.send_vel(self.planner.velocity)
 
     def handle_key_release(self, key):
         from PyQt6.QtCore import Qt as _Qt
         if key in (_Qt.Key.Key_Up, _Qt.Key.Key_Down,
                    _Qt.Key.Key_Left, _Qt.Key.Key_Right):
-            self._send(0, 0, 0)
+            self.send_vel(self.planner.ZERO_VEL)
+            
+    
+    def adjust_velocity(self, vel_type:str, component:str, adjustment:float):
+        
+        #Tweaks the velocity
+        #TODO: Implement something that will ramp up the velocity command to a max value (likely 1) the longer the key/button is pressed
+        
+        self.planner.velocity[vel_type][component] = adjustment
+        
