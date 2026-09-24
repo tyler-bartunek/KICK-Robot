@@ -1,8 +1,7 @@
 
 
-from PyQt6.QtCore import QObject
+from PyQt6.QtCore import QObject, pyqtSignal
 
-from connection import RobotProfileManager
 from ros_bridge import ROS_StreamWorker
 
 
@@ -15,10 +14,8 @@ widget_types = {'manual':Manual_Control}
 class Session(QObject):
     """
     A Session represents a single connection to a robot, and is responsible for managing the state of that connection.
-    It holds references to the robot profile, and any other relevant state information. Management of ROS bridge 
-    connections is to be determined, as it is not clear if the ROS bridge should persist when the GUI
-    does not have the robot selected, or if the planner will need access to the ROS bridge in order to do what
-    it needs to do. For now, the ROS bridge is managed by the GUI and is not part of the Session.
+    It holds the robot hostname, the ROS bridge connection for that robot, and keeps track of what planner instance the 
+    robot is connected to. May get refactored as time goes on to add flexibility/profile info, hard to say. 
     """
     
     def __init__(self, hostname: str, bridge:ROS_StreamWorker, parent=None):
@@ -33,10 +30,12 @@ class Session(QObject):
         
 
 
-class SessionManager:
+class SessionManager(QObject):
     
-    def __init__(self):
-        
+    invalid_session_id = pyqtSignal(str)
+    
+    def __init__(self, parent = None):
+        super().__init__(parent)
         self._sessions: list[Session] = []
         
     def add_or_update(self, session:Session):
@@ -49,6 +48,12 @@ class SessionManager:
         session_names = [s.name for s in self._sessions]
         if hostname in session_names:
             matching_sessions = [s for s in self._sessions if s.name == hostname]
-            return matching_sessions[0]
+            return matching_sessions[0] #Assumption that only one item will kick back
         else:
-            pass #TODO: Decide if we want this to automatically make a session or throw an error
+            #TODO: figure out what to do with a non-matching hostname. 
+            # Technically, this should be impossible with the code as-intended.
+            # Only issue is if this is possible as-written for us to end up here.
+            
+            #For now, let's set this to send something to the logger.
+            self.invalid_session_id.emit(f"No control session exists for {hostname}")
+            pass 

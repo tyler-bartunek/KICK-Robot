@@ -214,8 +214,13 @@ class MainWindow(QMainWindow):
                     lambda reason: self.fault_log.update_faults(f"Pi: {reason}", level="error"))
         ros_worker.connection_lost.connect(
                     lambda reason: self.fault_log.update_faults(f"Pi: {reason}", level="error"))
+        
+        self.control_session_manager.invalid_session_id.connect(
+                    lambda reason: self.fault_log.update_faults(f"GUI: {reason}", level="error")
+        )
  
-        # Wire velocity commands -> ROS publisher 
+        # Wire the control dropdown to change the session type. I think this also connects the 
+        # control widget/session to the cmd_vel topic.
         self.bottom_section.control.control_mode.connect(session.assign_planner)
         
         #Wire the disconnect signal
