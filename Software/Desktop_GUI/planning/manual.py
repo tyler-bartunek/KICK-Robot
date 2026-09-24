@@ -27,6 +27,8 @@ class Manual_Control(QWidget):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(6)
+        
+        self.setFocusPolicy(_Qt.FocusPolicy.StrongFocus)
 
         # Scheme toggle
         scheme_row = QHBoxLayout()
@@ -36,10 +38,15 @@ class Manual_Control(QWidget):
             btn = QPushButton(label)
             btn.setObjectName("SchemeButton")
             btn.setCheckable(True)
+            btn.clicked.connect(self._on_scheme_changed)
             self._scheme_group.addButton(btn)
             scheme_row.addWidget(btn)
         self._scheme_group.buttons()[0].setChecked(True)
         outer.addLayout(scheme_row)
+        
+        #Wire the keyboard button to enable self.handle_key_press/release
+        
+        #Wire the gamepad button to enable d-pad?
 
         # D-pad + velocity readout
         lower = QHBoxLayout()
@@ -113,6 +120,24 @@ class Manual_Control(QWidget):
         layout.addWidget(v)
         return {"layout": layout, "value": v}
     
+    def _on_scheme_changed(self):
+        if self._scheme_group.checkedButton().text() == "keyboard":
+            self.setFocus()   # explicitly pull focus onto THIS widget, not the button just clicked
+        else:
+            self.clearFocus() #Release focus for other widgets
+
+    def keyPressEvent(self, event):
+        if self._scheme_group.checkedButton().text() != "keyboard" or event.isAutoRepeat():
+            super().keyPressEvent(event)   # let Qt's default handling take unhandled/repeat events
+            return
+        self.handle_key_press(event.key())
+
+    def keyReleaseEvent(self, event):
+        if self._scheme_group.checkedButton().text() != "keyboard" or event.isAutoRepeat():
+            super().keyReleaseEvent(event)
+            return
+        self.handle_key_release(event.key())
+    
     def _on_dpad_pressed(self, cell):
         if cell == "·":
             self._zero_and_send()
@@ -143,7 +168,7 @@ class Manual_Control(QWidget):
     # ------------------------------------------------------------------
     # Call from MainWindow.keyPressEvent / keyReleaseEvent
     # ------------------------------------------------------------------
-
+    
     def handle_key_press(self, key):
         
         #R: clockwise
