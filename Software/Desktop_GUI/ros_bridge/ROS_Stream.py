@@ -152,6 +152,28 @@ class ROS_StreamWorker(QObject):
         #Send the new velocity command to the device 
         self.cmd_vel_publisher.publish(velocity)
         
+    
+    def push_params(self, params: dict):    
+        """
+        Push parameters to the robot via the ROS parameter server.
+        
+        The params dictionary structure is still TBD because I may need
+        to tweak parameters of multiple nodes, and the ROS parameter server
+        is node-specific. Once the node structure is finalized, this function
+        will be updated to handle the correct parameter paths.
+        
+        We are going to put the actual push into a try-except block
+        to catch any strangeness from a bad parameter name or misbehavior of
+        the ROS parameter server.
+        """
+        try:
+            for param_name, param_value in params.items():
+                self.client.set_param(param_name, param_value)
+                self.log_message.emit(f"Set parameter {param_name} to {param_value}", "INFO")
+        except Exception as e:
+            print(f"Error pushing parameters: {e}")
+            self.log_message.emit(f"Error pushing parameters: {e}", "ERROR")
+        
         
     def disconnect(self, confirm:bool):
         """Clean shutdown — unsubscribe, unadvertise, close connection."""

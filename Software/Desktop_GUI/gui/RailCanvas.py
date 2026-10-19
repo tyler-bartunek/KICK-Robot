@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
     QFormLayout, QPushButton, QLabel, QLineEdit, QComboBox,
     QDoubleSpinBox, QSpinBox, QSizePolicy, QScrollArea, QFrame
 )
-from PyQt6.QtGui import QPainter, QPen, QColor
+from PyQt6.QtGui import QPainter, QPen, QColor, QDoubleValidator
 from PyQt6.QtCore import Qt, pyqtSignal
 
 
@@ -23,12 +23,12 @@ class _DimBracket(QWidget):
     Draws: left-tick --- [label / input] --- right-tick
     Line runs through the vertical center of the widget.
     """
-    value_changed = pyqtSignal(int)
+    value_changed = pyqtSignal(str)
 
     TICK_H = 8
     GAP    = 6
 
-    def __init__(self, value_mm: int = 65, parent=None):
+    def __init__(self, value_mm: float = 100., parent=None):
         super().__init__(parent)
         self.setObjectName("DimBracket")
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
@@ -39,18 +39,19 @@ class _DimBracket(QWidget):
         outer.setSpacing(2)
         outer.addStretch(1)
 
-        self._label = QLabel("rail sep")
+        self._label = QLabel("rail sep (mm)")
         self._label.setObjectName("DimBracketLabel")
         self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self._input = QSpinBox()
+        # Input field for the dimension value
+        self._input = QLineEdit()
         self._input.setObjectName("DimBracketInput")
-        self._input.setRange(0, 999)
-        self._input.setValue(value_mm)
-        self._input.setSuffix(" mm")
+        #Make sure the input text is always a number (float)
+        self._input.setValidator(QDoubleValidator(0, 9999, 2, self))
+        self._input.setPlaceholderText(str(value_mm))
         self._input.setFixedWidth(80)
         self._input.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._input.valueChanged.connect(self.value_changed)
+        self._input.textChanged.connect(self.value_changed)
 
         outer.addWidget(self._label, 0, Qt.AlignmentFlag.AlignHCenter)
         outer.addWidget(self._input, 0, Qt.AlignmentFlag.AlignHCenter)
@@ -77,11 +78,11 @@ class _DimBracket(QWidget):
 
         p.end()
 
-    def value(self) -> int:
-        return self._input.value()
+    def value(self) -> float:
+        return float(self._input.text() or 0)
 
-    def set_value(self, v: int):
-        self._input.setValue(v)
+    def set_value(self, v: float):
+        self._input.setText(str(v))
 
 
 class _Rail(QWidget):
@@ -179,6 +180,9 @@ class _ModuleSettingsPanel(QWidget):
         """
         Parse <type_name>.xml and rebuild the config_settings form.
         Called by RailCanvas.load_module_type().
+        
+        TODO: Replace this parsing logic with the more general parser getting written in
+        xml_settings_parser/parser.py once that is complete.
         """
         self._module_type = type_name
         self._type_label.setText(type_name.replace("_", " "))
@@ -258,6 +262,9 @@ class _ModuleSettingsPanel(QWidget):
         Dropdown option format in XML:
             "Label:value,Label:value"   — separate display from internal value
             "Label,Label"               — display and internal value are the same
+            
+        TODO: Replace parsing logic with the more general parser getting written in 
+        xml_settings_parser/parser.py once that is complete.
         """
 
         if ptype == "float":
@@ -347,7 +354,7 @@ class RailCanvas(QWidget):
         outer.setSpacing(4)
  
         self._rail_left  = _Rail()
-        self._bracket    = _DimBracket(value_mm=65)
+        self._bracket    = _DimBracket(value_mm=100.)
         self._rail_right = _Rail()
         self._settings   = _ModuleSettingsPanel()
  
@@ -382,7 +389,7 @@ class RailCanvas(QWidget):
         self._settings.load_module_type(type_name)
 
     def load_config(self, cfg: dict):
-        self._bracket.set_value(cfg.get("rail_sep_mm", 65))
+        self._bracket.set_value(cfg.get("rail_sep_mm", 100))
 
     # ------------------------------------------------------------------
     # Private
