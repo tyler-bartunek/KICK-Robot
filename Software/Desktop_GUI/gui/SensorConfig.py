@@ -1,8 +1,10 @@
 from pathlib import Path
-import xml.etree.ElementTree as ET
 
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QFormLayout, QLabel, QPushButton, QListWidget, QDialog, QLineEdit
-from PyQt6.QtCore import Qt, pyqtSignal
+from xml_settings_parser.parser import XMLSettingsParser
+
+from PyQt6.QtWidgets import (
+    QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QListWidget, QDialog
+)
 
 #Hate hard-coding this, but I've been left with little choice.
 sensor_names = ["6-axis IMU", "9-axis IMU", "LIDAR", "Ultrasonic Distance"]
@@ -21,6 +23,7 @@ class _Sensor(QWidget):
         self.full_name = sensor_name
         
         self.configured = False
+        self.settings: dict[str, str] = {}
         
         #Simplify the name
         simple_name = sensor_name.strip(" ")
@@ -47,7 +50,9 @@ class _Sensor(QWidget):
         
         
 class _Sensor_Setting_Window(QDialog):
-    
+
+    settings_files = [sensor_config_path / file for file in setting_filenames]
+
     def __init__(self, sensor:_Sensor, parent = None):
         
         #Set up the basics of the dialog window
@@ -59,12 +64,10 @@ class _Sensor_Setting_Window(QDialog):
         #Put the setting files into a searchable dict
         self._assemble_setting_dict()
         
-        #Initialize the settings dict
-        self.settings = {}
-        
         #Setup the layout
         outer = QVBoxLayout(self)
         
+        #Create the parameter section and add it to the layout
         outer.addWidget(self._build_parameter_section())
         
         outer.addStretch(1)
@@ -75,59 +78,19 @@ class _Sensor_Setting_Window(QDialog):
         outer.addWidget(save_button)
         
     def _build_parameter_section(self) -> QWidget:
-        
-        #Make the QFormLayout
-        container = QWidget()
-        form = QFormLayout(container)
-        
-        self.param_fields = {}
-        
-        root = self._fetch_root(form)
-        
-        if root:
-            for param in root.findall('parameter'):
-                
-                param_name = param.attrib.get('name')
-                param_label = param.attrib.get('label')
-                param_type = param.attrib.get('type')
-                param_default = param.attrib.get('default')
-                
-                entry_box = QLineEdit()
-                if self.sensor.configured:
-                    entry_box.setText(f"{self.sensor.settings[param_name]}")
-                else:
-                    entry_box.setText(f"{param_default}")
-                    
-                form.addRow(param_label, entry_box)
-                
-                self.param_fields[param_name] = entry_box
-            
-        return container
-    
-    def _extract_settings(self):
-        
-        return {name: field.text() for name, field in self.param_fields.items()}      
-    
-    def _fetch_root(self, form = None):    
-        
-        #Try and extract parameters
-        identifier = self.sensor.full_name.split('_')[0]
-        print(identifier)
-        
-        root = None
-        
-        try:
-            file = ET.parse(self.sensor_setting_dict[identifier])
-            root = file.getroot()
-        except FileNotFoundError as f:
-            if form:
-                form.addRow(QLabel(f"No recognized module settings found: {f}"))
-        except ET.ParseError as e:
-            if form:
-                form.addRow(QLabel(f"Unable to parse settings file: {e}"))
-            
-        return root
-    
+        sensor_identifier = self.sensor.full_name.split('_')[0]
+        settings_path = self.sensor_setting_dict[sensor_identifier]
+        self.param_parser = XMLSettingsParser(settings_path, is_module_settings=False)
+        parameter_widget = self.param_parser.build_widget()
+
+        if self.sensor.configured:
+            self.param_parser.set_settings(self.sensor.settings)
+
+        return parameter_widget
+
+    def _extract_settings(self) -> dict[str, str]:
+        return self.param_parser.get_settings()
+
     def _on_save(self):
         
         self.sensor.settings = self._extract_settings()
@@ -137,10 +100,8 @@ class _Sensor_Setting_Window(QDialog):
         
 
     def _assemble_setting_dict(self) -> None:
-        
-        settings_files = [sensor_config_path / file for file in setting_filenames]
 
-        self.sensor_setting_dict = {sensor:file for sensor, file in zip(sensor_names, settings_files)}
+        self.sensor_setting_dict = {sensor:file for sensor, file in zip(sensor_names, self.settings_files)}
         
         
         

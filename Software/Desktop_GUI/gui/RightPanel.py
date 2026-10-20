@@ -3,8 +3,8 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 
+from kick_core import _MODULE_TYPE_ALT_NAMES, _MODULE_COLOR_MAP  # Import the module type map and alt names from kick_core
 
-device_types = {"0x00":None, "0x01":"Echo", "0x02":"Wheels L", "0x03":"Wheels R", "0x04":"Quad Leg A", "0x05":"Quad Leg B"}
 
 class _SectionHeader(QLabel):
     def __init__(self, text: str, parent=None):
@@ -95,11 +95,9 @@ class RightPanel(QWidget):
         lib_layout.setContentsMargins(12, 10, 12, 10)
         lib_layout.setSpacing(4)
         lib_layout.addWidget(_SectionHeader("Module Library"))
-        lib_layout.addWidget(_ModuleLibraryItem("Echo",       "#5BA8A0"))  # muted teal — sensor/comms feel
-        lib_layout.addWidget(_ModuleLibraryItem("Wheels L",   "#7B68EE"))  # slate purple
-        lib_layout.addWidget(_ModuleLibraryItem("Wheels R",   "#9B88FF"))  # lighter purple — related to L
-        lib_layout.addWidget(_ModuleLibraryItem("Quad Leg A", "#E07B54"))  # terracotta
-        lib_layout.addWidget(_ModuleLibraryItem("Quad Leg B", "#C45A35"))
+        for type_name, color in _MODULE_COLOR_MAP.items():
+            alt_name = _MODULE_TYPE_ALT_NAMES.get(type_name, type_name)
+            lib_layout.addWidget(_ModuleLibraryItem(alt_name, color))
 
         sep = QFrame()
         sep.setFrameShape(QFrame.Shape.HLine)

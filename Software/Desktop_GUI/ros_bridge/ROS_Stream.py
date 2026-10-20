@@ -2,17 +2,11 @@
 from PyQt6.QtCore import QObject, pyqtSignal
 import roslibpy
 
+from kick_core import _MODULE_TYPE_MAP  # Import the module type map from kick_core
+
 #Import utility to time how fast bot state messages are coming in
 from time import perf_counter
 
-_MODULE_TYPE_MAP: dict[int, str] = {
-    0x00: "NA",   # Not applicable, no connection
-    0x01: "ECH",  # Echo- Debug case
-    0x02: "MW-L",   # Left Mecanum Wheel
-    0x03: "MW-R",   # Right Mechanum Wheel
-    0x04: "QL-A",   # Quadruped leg A
-    0x05: "QL-B",   # Quadruped leg B
-}
  
 def _hw_id_to_type(hw_id: int) -> str:
     return _MODULE_TYPE_MAP.get(hw_id, f"UNK({hw_id:#04x})")
@@ -151,6 +145,28 @@ class ROS_StreamWorker(QObject):
     def _velocity_msg_callback(self, velocity:dict[str,dict[str,float]]):
         #Send the new velocity command to the device 
         self.cmd_vel_publisher.publish(velocity)
+        
+    
+    def push_params(self, params: dict):    
+        """
+        Push parameters to the robot via the ROS parameter server.
+        
+        The params dictionary structure is still TBD because I may need
+        to tweak parameters of multiple nodes, and the ROS parameter server
+        is node-specific. Once the node structure is finalized, this function
+        will be updated to handle the correct parameter paths.
+        
+        We are going to put the actual push into a try-except block
+        to catch any strangeness from a bad parameter name or misbehavior of
+        the ROS parameter server.
+        """
+        try:
+            for param_name, param_value in params.items():
+                self.client.set_param(param_name, param_value)
+                self.log_message.emit(f"Set parameter {param_name} to {param_value}", "INFO")
+        except Exception as e:
+            print(f"Error pushing parameters: {e}")
+            self.log_message.emit(f"Error pushing parameters: {e}", "ERROR")
         
         
     def disconnect(self, confirm:bool):

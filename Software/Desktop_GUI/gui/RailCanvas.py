@@ -1,17 +1,20 @@
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
+from xml_settings_parser import XMLSettingsParser
+
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout,
-    QFormLayout, QPushButton, QLabel, QLineEdit, QComboBox,
-    QDoubleSpinBox, QSpinBox, QSizePolicy, QScrollArea, QFrame
+    QFormLayout, QPushButton, QLabel, QLineEdit,
+    QSizePolicy, QScrollArea, QFrame
 )
-from PyQt6.QtGui import QPainter, QPen, QColor
+from PyQt6.QtGui import QPainter, QPen, QColor, QDoubleValidator
 from PyQt6.QtCore import Qt, pyqtSignal
 
 
 # Fixed hardware constants — not user-editable at runtime
-RIDGE_COUNT    = 7
+SEGMENT_COUNT    = 6
+RIDGE_COUNT     = 7
 RIDGE_PITCH_MM = 12
 
 MODULE_DEF_DIR = Path(__file__).parent.parent / "assets" / "_define" / "modules"
@@ -23,12 +26,12 @@ class _DimBracket(QWidget):
     Draws: left-tick --- [label / input] --- right-tick
     Line runs through the vertical center of the widget.
     """
-    value_changed = pyqtSignal(int)
+    value_changed = pyqtSignal(str)
 
     TICK_H = 8
     GAP    = 6
 
-    def __init__(self, value_mm: int = 65, parent=None):
+    def __init__(self, value_mm: float = 100., parent=None):
         super().__init__(parent)
         self.setObjectName("DimBracket")
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
@@ -39,18 +42,19 @@ class _DimBracket(QWidget):
         outer.setSpacing(2)
         outer.addStretch(1)
 
-        self._label = QLabel("rail sep")
+        self._label = QLabel("rail sep (mm)")
         self._label.setObjectName("DimBracketLabel")
         self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self._input = QSpinBox()
+        # Input field for the dimension value
+        self._input = QLineEdit()
         self._input.setObjectName("DimBracketInput")
-        self._input.setRange(0, 999)
-        self._input.setValue(value_mm)
-        self._input.setSuffix(" mm")
+        #Make sure the input text is always a number (float)
+        self._input.setValidator(QDoubleValidator(0, 9999, 2, self))
+        self._input.setPlaceholderText(str(value_mm))
         self._input.setFixedWidth(80)
         self._input.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._input.valueChanged.connect(self.value_changed)
+        self._input.textChanged.connect(self.value_changed)
 
         outer.addWidget(self._label, 0, Qt.AlignmentFlag.AlignHCenter)
         outer.addWidget(self._input, 0, Qt.AlignmentFlag.AlignHCenter)
@@ -77,11 +81,11 @@ class _DimBracket(QWidget):
 
         p.end()
 
-    def value(self) -> int:
-        return self._input.value()
+    def value(self) -> float:
+        return float(self._input.text() or 0)
 
-    def set_value(self, v: int):
-        self._input.setValue(v)
+    def set_value(self, v: float):
+        self._input.setText(str(v))
 
 
 class _Rail(QWidget):
@@ -108,18 +112,27 @@ class _Rail(QWidget):
         p.setBrush(self.RAIL_COLOR)
         p.drawRoundedRect(self.rect().adjusted(1, 1, -1, -1), 4, 4)
 
+        #Create the segments with visible demarcation lines,
+        # with the ridge count representing the number of invisible position options
+        # along each segment for the module to be placed. 
+        
+        #Ridge count is unrelated to number of segments, but is instead a fixed
+        # number of ridges on a physical rail. 
+        
+        #The product of the number of segments and the ridge count is the total number
+        # of positions available for the module to be placed along the rail.
         p.setClipping(False)
         p.setPen(QPen(self.RIDGE_COLOR, 1))
         cx = w // 2
-        spacing = h / (RIDGE_COUNT + 1)
-        for i in range(1, RIDGE_COUNT + 1):
+        spacing = h / (SEGMENT_COUNT)
+        for i in range(1, SEGMENT_COUNT):
             y = int(spacing * i)
             p.drawLine(cx - self.RIDGE_HALF, y, cx + self.RIDGE_HALF, y)
 
         p.end()
 
 
-class _ModuleSettingsPanel(QWidget):
+class _ConfigSettingsPanel(QWidget):
     """
     Scrollable settings panel populated from a module XML definition.
     Renders config_settings fields only — ind_settings are handled by
@@ -166,10 +179,8 @@ class _ModuleSettingsPanel(QWidget):
         self._push_btn.clicked.connect(self._on_push)
         outer.addWidget(self._push_btn)
 
-        # param_name -> (widget, type_str, value_map)
-        # value_map is only populated for dropdowns: {display: internal_value}
-        self._fields: dict[str, tuple[QWidget, str, dict]] = {}
         self._module_type: str = ""
+        self._parser: XMLSettingsParser | None = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -190,46 +201,38 @@ class _ModuleSettingsPanel(QWidget):
             return
 
         try:
-            root = ET.parse(xml_path).getroot()
+            parser = XMLSettingsParser(xml_path, is_module_settings=True)
+            settings_widget = parser.build_widget(setting_type="config")
         except ET.ParseError as e:
             self._form_layout.addRow(QLabel(f"XML parse error: {e}"))
             return
+        except ValueError as e:
+            self._form_layout.addRow(QLabel(f"Unable to build settings: {e}"))
+            return
 
-        for param in root.findall("config_settings/parameter"):
-            name    = param.get("name",    "")
-            label   = param.get("label",   name)
-            ptype   = param.get("type",    "float")
-            default = param.get("default", "0")
-            unit    = param.get("unit",    "")
-            options = param.get("options", "")
-            p_min   = param.get("min",     None)
-            p_max   = param.get("max",     None)
-
-            result = self._make_widget(ptype, default, unit,
-                                       options, p_min, p_max)
-            if result is not None:
-                widget, value_map = result
-                self._fields[name] = (widget, ptype, value_map)
-                self._form_layout.addRow(label, widget)
+        self._parser = parser
+        self._parser.setting_update.connect(self._on_parameter_changed)
+        self._form_layout.addRow(settings_widget)
 
     def collect_config_settings(self) -> dict:
         """
         Return current values of all config_settings fields.
         Dropdowns return their internal value, not the display label.
         """
-        out = {}
-        for name, (widget, ptype, value_map) in self._fields.items():
+        if self._parser is None:
+            return {}
+
+        out: dict[str, object] = self._parser.get_settings()
+        for name, ptype in self._parser.param_types.items():
             if ptype == "dropdown":
-                display = widget.currentText()
-                # Fall back to display text if no internal value mapping exists
-                out[name] = value_map.get(display, display)
+                continue
             elif ptype == "float":
-                out[name] = widget.value()
+                out[name] = float(out[name])
             elif ptype == "double":
                 try:
-                    out[name] = float(widget.text())
+                    out[name] = float(out[name])
                 except ValueError:
-                    out[name] = widget.text()
+                    pass
         return out
 
     # ------------------------------------------------------------------
@@ -239,92 +242,40 @@ class _ModuleSettingsPanel(QWidget):
     def _clear_form(self):
         while self._form_layout.rowCount() > 0:
             self._form_layout.removeRow(0)
-        self._fields.clear()
+        self._parser = None
 
-    def _make_widget(
-        self,
-        ptype:   str,
-        default: str,
-        unit:    str,
-        options: str,
-        p_min:   str | None,
-        p_max:   str | None,
-    ) -> tuple[QWidget, dict] | None:
-        """
-        Build and return (widget, value_map) for the given parameter type.
-        value_map is {display_label: internal_value} for dropdowns, {} otherwise.
-        Returns None for unrecognised types so the row is silently skipped.
-
-        Dropdown option format in XML:
-            "Label:value,Label:value"   — separate display from internal value
-            "Label,Label"               — display and internal value are the same
-        """
-
-        if ptype == "float":
-            w = QDoubleSpinBox()
-            w.setDecimals(2)
-            w.setRange(
-                float(p_min) if p_min is not None else -9999.0,
-                float(p_max) if p_max is not None else  9999.0,
-            )
-            if unit:
-                w.setSuffix(f" {unit}")
-            try:
-                w.setValue(float(default))
-            except ValueError:
-                w.setValue(0.0)
-            w.valueChanged.connect(
-                lambda _: self.settings_changed.emit(self.collect_config_settings())
-            )
-            return w, {}
-
-        elif ptype == "double":
-            w = QLineEdit()
-            w.setText(default)
-            if unit:
-                w.setPlaceholderText(unit)
-            w.textChanged.connect(
-                lambda _: self.settings_changed.emit(self.collect_config_settings())
-            )
-            return w, {}
-
-        elif ptype == "dropdown":
-            w = QComboBox()
-            value_map: dict[str, str] = {}
-
-            for token in options.split(","):
-                token = token.strip()
-                if not token:
-                    continue
-                if ":" in token:
-                    display, internal = token.split(":", 1)
-                    display  = display.strip()
-                    internal = internal.strip()
-                else:
-                    display = internal = token
-                value_map[display] = internal
-                w.addItem(display)
-
-            # Select default by display label first, then by internal value
-            idx = w.findText(default)
-            if idx < 0:
-                # Try matching against internal values
-                for i, (disp, val) in enumerate(value_map.items()):
-                    if val == default:
-                        idx = i
-                        break
-            if idx >= 0:
-                w.setCurrentIndex(idx)
-
-            w.currentTextChanged.connect(
-                lambda _: self.settings_changed.emit(self.collect_config_settings())
-            )
-            return w, value_map
-
-        return None   # unknown type — skip row gracefully
+    def _on_parameter_changed(self):
+        self.settings_changed.emit(self.collect_config_settings())
 
     def _on_push(self):
         self.settings_changed.emit(self.collect_config_settings())
+        
+        
+        
+class ModuleBox(QWidget):
+    """
+    A simple box with a label, draggable to the discrete positions along the rails. 
+    
+    The box is both a visual representation of the module for setting the position settings
+    along the rails for the user to reference, and can also be moved along the rail using 
+    a scroll wheel indicating how many ridges to move the module relative to the default position. 
+    
+    Positive values move the module up the rail, negative values move the module down the rail. 
+    
+    The box also has a label indicating the module type, and can be clicked to open a context menu
+    for changing the module-level settings (ind_settings) for the module. The context menu is populated from the module's XML definition. 
+    """
+    
+    def __init__(self, module_type: str, parent=None):
+        
+        super().__init__(parent)
+        self.setObjectName("ModuleBox")
+        self.setFixedSize(100, 50)
+        self.module_type = module_type
+        self.label = QLabel(module_type, self)
+        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.label.setGeometry(0, 0, 100, 50)
+    
 
 
 class RailCanvas(QWidget):
@@ -347,9 +298,11 @@ class RailCanvas(QWidget):
         outer.setSpacing(4)
  
         self._rail_left  = _Rail()
-        self._bracket    = _DimBracket(value_mm=65)
+        self._bracket    = _DimBracket(value_mm=100.)
         self._rail_right = _Rail()
-        self._settings   = _ModuleSettingsPanel()
+        self._settings   = _ConfigSettingsPanel()
+        
+        self.devices = {i:{} for i in range(SEGMENT_COUNT)}  # Store device info for each segment
  
         self._settings.settings_changed.connect(self._on_settings_changed)
  
@@ -377,12 +330,20 @@ class RailCanvas(QWidget):
     # Public API
     # ------------------------------------------------------------------
 
-    def load_module_type(self, type_name: str):
+    def load_module_type(self, device:dict):
         """Called by MainWindow when bus_state reports a module type."""
+        type_name = device["type"]
+        position = device["position"]
+        #If the module type has changed, update the module box and reload the settings panel
+        #Also draw the box on the rail if it doesn't exist yet.
+        if (not self.devices[position]) or (self.devices[position].get("type") != type_name):
+            self.devices[position] = device
+            self.devices[position]["box"] = ModuleBox(type_name)
         self._settings.load_module_type(type_name)
+        
 
     def load_config(self, cfg: dict):
-        self._bracket.set_value(cfg.get("rail_sep_mm", 65))
+        self._bracket.set_value(cfg.get("rail_sep_mm", 100))
 
     # ------------------------------------------------------------------
     # Private
@@ -391,7 +352,10 @@ class RailCanvas(QWidget):
     def _on_settings_changed(self, settings: dict):
         self.config_changed.emit({
             "rail_sep_mm":    self._bracket.value(),
-            "num_ridges":     RIDGE_COUNT,
+            "num_segments":     SEGMENT_COUNT,
             "ridge_pitch_mm": RIDGE_PITCH_MM,
             **settings,
         })
+        
+        
+        
