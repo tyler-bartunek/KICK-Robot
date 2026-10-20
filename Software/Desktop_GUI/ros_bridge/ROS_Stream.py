@@ -2,14 +2,14 @@
 from PyQt6.QtCore import QObject, pyqtSignal
 import roslibpy
 
-from kick_core import _MODULE_TYPE_MAP  # Import the module type map from kick_core
+from kick_core import MODULE_TYPE_MAP  # Import the module type map from kick_core
 
 #Import utility to time how fast bot state messages are coming in
 from time import perf_counter
 
  
 def _hw_id_to_type(hw_id: int) -> str:
-    return _MODULE_TYPE_MAP.get(hw_id, f"UNK({hw_id:#04x})")
+    return MODULE_TYPE_MAP.get(hw_id, f"UNK({hw_id:#04x})")
 
 
 

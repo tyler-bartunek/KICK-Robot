@@ -3,10 +3,12 @@ import xml.etree.ElementTree as ET
 
 from xml_settings_parser import XMLSettingsParser
 
+from kick_core import MODULE_COLOR_MAP, MODULE_DEF_DIR, MODULE_TYPE_MAP
+
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout,
     QFormLayout, QPushButton, QLabel, QLineEdit,
-    QSizePolicy, QScrollArea, QFrame
+    QSizePolicy, QScrollArea, QFrame, QDialog
 )
 from PyQt6.QtGui import QPainter, QPen, QColor, QDoubleValidator
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -16,8 +18,6 @@ from PyQt6.QtCore import Qt, pyqtSignal
 SEGMENT_COUNT    = 6
 RIDGE_COUNT     = 7
 RIDGE_PITCH_MM = 12
-
-MODULE_DEF_DIR = Path(__file__).parent.parent / "assets" / "_define" / "modules"
 
 
 class _DimBracket(QWidget):
@@ -271,10 +271,66 @@ class ModuleBox(QWidget):
         super().__init__(parent)
         self.setObjectName("ModuleBox")
         self.setFixedSize(100, 50)
+        
         self.module_type = module_type
         self.label = QLabel(module_type, self)
+        
+        self.configured = False
+        self.settings: dict[str, str] = {}
+        
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.label.setGeometry(0, 0, 100, 50)
+        
+    
+class _Module_Settings_Window(QDialog):
+    
+    def __init__(self, module:ModuleBox, parent = None):
+        
+        #Set up the basics of the dialog window
+        super().__init__(parent)
+        self.module = module
+        self.setObjectName("ConfigWindow")
+        self.setWindowTitle(f"{self.module.module_type} Configuration")
+        
+        #Put the setting files into a searchable dict
+        self._assemble_setting_dict()
+        
+        #Setup the layout
+        outer = QVBoxLayout(self)
+        
+        #Create the parameter section and add it to the layout
+        outer.addWidget(self._build_parameter_section())
+        
+        outer.addStretch(1)
+        
+        save_button = QPushButton("Save Module Settings")
+        save_button.clicked.connect(self._on_save)
+        
+        outer.addWidget(save_button)
+        
+    def _build_parameter_section(self) -> QWidget:
+        # sensor_identifier = self.sensor.full_name.split('_')[0]
+        settings_path = MODULE_DEF_DIR / f"{MODULE_TYPE_MAP[self.module.module_type]}.xml"
+        
+        try:
+            self.param_parser = XMLSettingsParser(settings_path, is_module_settings=True)
+            parameter_widget = self.param_parser.build_widget(setting_type="ind")
+        except ET.ParseError:
+            pass #TODO: Determine what to do here
+
+        if self.module.configured:
+            self.param_parser.set_settings(self.module.settings)
+
+        return parameter_widget
+
+    def _extract_settings(self) -> dict[str, str]:
+        return self.param_parser.get_settings()
+
+    def _on_save(self):
+        
+        self.module.settings = self._extract_settings()
+        self.module.configured = True
+        self.accept()
     
 
 
@@ -352,8 +408,6 @@ class RailCanvas(QWidget):
     def _on_settings_changed(self, settings: dict):
         self.config_changed.emit({
             "rail_sep_mm":    self._bracket.value(),
-            "num_segments":     SEGMENT_COUNT,
-            "ridge_pitch_mm": RIDGE_PITCH_MM,
             **settings,
         })
         

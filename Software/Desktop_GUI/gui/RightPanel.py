@@ -3,7 +3,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 
-from kick_core import _MODULE_TYPE_ALT_NAMES, _MODULE_COLOR_MAP  # Import the module type map and alt names from kick_core
+from kick_core import MODULE_TYPE_ALT_NAMES, MODULE_COLOR_MAP  # Import the module type map and alt names from kick_core
 
 
 class _SectionHeader(QLabel):
@@ -95,8 +95,8 @@ class RightPanel(QWidget):
         lib_layout.setContentsMargins(12, 10, 12, 10)
         lib_layout.setSpacing(4)
         lib_layout.addWidget(_SectionHeader("Module Library"))
-        for type_name, color in _MODULE_COLOR_MAP.items():
-            alt_name = _MODULE_TYPE_ALT_NAMES.get(type_name, type_name)
+        for type_name, color in MODULE_COLOR_MAP.items():
+            alt_name = MODULE_TYPE_ALT_NAMES.get(type_name, type_name)
             lib_layout.addWidget(_ModuleLibraryItem(alt_name, color))
 
         sep = QFrame()

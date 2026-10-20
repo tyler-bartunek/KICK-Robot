@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from xml_settings_parser.parser import XMLSettingsParser
+from kick_core import SENSOR_DEF_DIR
 
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QListWidget, QDialog
@@ -10,7 +11,6 @@ from PyQt6.QtWidgets import (
 sensor_names = ["6-axis IMU", "9-axis IMU", "LIDAR", "Ultrasonic Distance"]
 setting_filenames = ["6IMU.xml", "9IMU.xml", "LIDAR.xml", "Ultrasonic.xml"]
 sensor_setting_dict = {sensor:file for sensor, file in zip(sensor_names, setting_filenames)}
-sensor_config_path = Path(__file__).parent.parent / "assets" / "_define" / "sensors"
 
 
 class _Sensor(QWidget):
@@ -51,7 +51,7 @@ class _Sensor(QWidget):
         
 class _Sensor_Setting_Window(QDialog):
 
-    settings_files = [sensor_config_path / file for file in setting_filenames]
+    settings_files = [SENSOR_DEF_DIR / file for file in setting_filenames]
 
     def __init__(self, sensor:_Sensor, parent = None):
         
