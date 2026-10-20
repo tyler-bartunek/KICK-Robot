@@ -51,6 +51,8 @@ class MatrixWidget(QWidget):
     """
     A custom QWidget for displaying and editing matrix parameters.
     """
+    value_changed = pyqtSignal()
+
     def __init__(self):
         super().__init__()
     
@@ -62,6 +64,7 @@ class MatrixWidget(QWidget):
             for j in range(self.cols):
                 line_edit = QLineEdit()
                 line_edit.setText(str(default_values[i][j]))
+                line_edit.textChanged.connect(self.value_changed)
                 layout.addWidget(line_edit, i, j)
         
         self.setLayout(layout)
@@ -119,7 +122,8 @@ class XMLSettingsParser(QObject):
     signal_map = {
         QLineEdit: 'textChanged',
         QComboBox: 'currentIndexChanged',
-        QSpinBox: 'valueChanged'
+        QSpinBox: 'valueChanged',
+        MatrixWidget: 'value_changed'
     }
     
     def __init__(self, xml_file_path: str, is_module_settings: bool = True):
@@ -135,6 +139,7 @@ class XMLSettingsParser(QObject):
         self.root = self.tree.getroot()
         self.is_module_settings = is_module_settings
         self.param_dict: dict[str, QWidget] = {}
+        self.param_types: dict[str, str] = {}
         
         
     def build_widget(self, **kwargs) -> QWidget:
@@ -148,6 +153,7 @@ class XMLSettingsParser(QObject):
         """
         
         self.param_dict.clear()
+        self.param_types.clear()
         
         if self.is_module_settings:
             return self.build_module_settings_widgets(**kwargs)
@@ -187,7 +193,7 @@ class XMLSettingsParser(QObject):
                 inner_layout.addWidget(input_widget, i, 1)
                 self._wire_input_signal(input_widget, parameter.get('name'))
                 
-                layout.addLayout(inner_layout)       
+            layout.addLayout(inner_layout)
         
         widget.setLayout(layout)
         return widget
@@ -279,7 +285,19 @@ class XMLSettingsParser(QObject):
             if param_type == "dropdown":
                 for option in parameter.findall('option'):
                     widget.addItem(option.text, option.get('value'))
+                if widget.count() == 0:
+                    for token in parameter.get('options', '').split(','):
+                        token = token.strip()
+                        if not token:
+                            continue
+                        if ':' in token:
+                            label, value = (part.strip() for part in token.split(':', 1))
+                        else:
+                            label = value = token
+                        widget.addItem(label, value)
                 default_index = widget.findData(parameter.get('default'))
+                if default_index < 0:
+                    default_index = widget.findText(parameter.get('default', ''))
                 if default_index >= 0:
                     widget.setCurrentIndex(default_index)
 
@@ -299,7 +317,11 @@ class XMLSettingsParser(QObject):
             elif param_type == "float":
                 widget.setText(parameter.get('default', ''))
             
-            self.param_dict[parameter.get('name')] = widget
+            name = parameter.get('name')
+            if name is None:
+                raise ValueError("Every parameter must have a name")
+            self.param_dict[name] = widget
+            self.param_types[name] = param_type
             return widget
         else:
             raise ValueError(f"Unsupported parameter type: {param_type}")
@@ -318,6 +340,11 @@ class XMLSettingsParser(QObject):
                 signal.connect(
                     lambda index, name=parameter_name, widget=input_widget:
                     self.setting_update.emit(name, widget.itemData(index))
+                )
+            elif isinstance(input_widget, MatrixWidget):
+                signal.connect(
+                    lambda name=parameter_name, widget=input_widget:
+                    self.setting_update.emit(name, widget.value())
                 )
             else:
                 signal.connect(

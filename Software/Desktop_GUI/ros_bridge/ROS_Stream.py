@@ -2,17 +2,11 @@
 from PyQt6.QtCore import QObject, pyqtSignal
 import roslibpy
 
+from kick_core import _MODULE_TYPE_MAP  # Import the module type map from kick_core
+
 #Import utility to time how fast bot state messages are coming in
 from time import perf_counter
 
-_MODULE_TYPE_MAP: dict[int, str] = {
-    0x00: "NA",   # Not applicable, no connection
-    0x01: "ECH",  # Echo- Debug case
-    0x02: "MW-L",   # Left Mecanum Wheel
-    0x03: "MW-R",   # Right Mechanum Wheel
-    0x04: "QL-A",   # Quadruped leg A
-    0x05: "QL-B",   # Quadruped leg B
-}
  
 def _hw_id_to_type(hw_id: int) -> str:
     return _MODULE_TYPE_MAP.get(hw_id, f"UNK({hw_id:#04x})")
