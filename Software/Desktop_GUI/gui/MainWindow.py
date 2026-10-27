@@ -15,21 +15,22 @@ from gui._section_title_bar import TitleBar, RobotItem
 from gui._section_toolbar import Toolbar
 
 # Local imports: Device adding
-from connection import DNSWorker, RobotProfile, RobotProfileManager, RobotAvailabilityMonitor
+from connection import (DNSWorker, RobotProfile, RobotProfileManager, 
+                        RobotAvailabilityMonitor)
 
-from planning import SessionManager, Session
+from kick_core import IMG_DIR
 
 # Local imports: ROS worker
-from ros_bridge.ROS_Stream import ROS_StreamWorker #REMOVE
+from ros_bridge.ROS_Stream import ROS_StreamWorker
+
+# Local imports: Motion planning
+from planning import SessionManager, Session
 
 # Local imports: central canvas
 from gui._section_middle import MiddleSection
 
 #Local imports: bottom portion
 from gui._section_bottom import BottomSection
-
-
-IMG_DIR = Path(__file__).parent.parent / "assets" / "img"
 
 
 class MainWindow(QMainWindow):

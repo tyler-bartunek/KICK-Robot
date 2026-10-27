@@ -8,13 +8,20 @@
     <ind_settings>
         <parameter name="z_offset" label="Axial Offset" type="float"
                    default="20" unit="mm" min="0" max="100" />
+        <parameter name="wheel_dia" label="Wheel Diameter" type="float"
+                   default="65" unit="mm" min="10" max="200" />
     </ind_settings>
 
     <!-- Configuration-level settings -->
     <config_settings>
-        <parameter name="wheel_dia" label="Wheel Diameter" type="float"
-                   default="65" unit="mm" min="10" max="200" />
-        <parameter name="control_type" label="Control Type" type="dropdown"
-                   default="vel" options="Velocity:vel,Position:pos" />
+        <parameter name="P" label="Proportional Gain" type="matrix" rows="3" cols="3" default="0.1,0,0;0,0.1,0;0,0,0.1"/>
+        <parameter name="I" label="Integral Gain" type="matrix" rows="3" cols="3" default="0,0,0;0,0,0;0,0,0"/>
+        <parameter name="D" label="Derivative Gain" type="matrix" rows="3" cols="3" default="0,0,0;0,0,0;0,0,0"/>
+        <!-- TODO: Implement control type parameter, or decide if this is the place for this at all -->
+        <!-- <parameter name="control_type" label="Control Type" type="dropdown"
+                   default="vel"/> 
+                   <option value="vel">velocity</option>
+                   <option value="pos">position</option>
+                   -->
     </config_settings>
 </module>

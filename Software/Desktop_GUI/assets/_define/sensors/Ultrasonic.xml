@@ -2,6 +2,6 @@
 
 <sensor name="Ultrasonic">
 
-    <parameter name="" label="" type="double" default=""/>
+    <parameter name="gain" label="gain" type="float" default="1.0"/>
 
 </sensor>
