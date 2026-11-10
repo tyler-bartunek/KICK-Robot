@@ -36,8 +36,22 @@ from gui._section_bottom import BottomSection
 class MainWindow(QMainWindow):
     
     
-    def __init__(self):
+    def __init__(self, parent=None, ros_worker_class=ROS_StreamWorker, dns_worker_class=DNSWorker):
+        """
+        Initialize the MainWindow.
+
+        Args:
+            parent: The parent widget.
+            ros_worker_class: The class to use for the ROS worker.
+            dns_worker_class: The class to use for the DNS worker.
+        """
         super().__init__()
+        
+        #TODO: Add ROS steam worker and discovery worker object types as input arguments to the MainWindow constructor, 
+        # so that they can be mocked for testing purposes. This will allow for easier unit testing of the MainWindow class 
+        # without requiring a live ROS connection or network discovery.
+        self.ros_worker_class = ros_worker_class
+        self.dns_worker_class = dns_worker_class
 
         self.setWindowTitle("KICK Robot Desktop")
         self.resize(1280, 720)
@@ -94,7 +108,7 @@ class MainWindow(QMainWindow):
         
         #Initialize the DiscoveryWorker to discover devices on the network
         self._dns_thread = QThread(self)
-        self.dns_worker = DNSWorker()
+        self.dns_worker = self.dns_worker_class()
         self.dns_worker.moveToThread(self._dns_thread)
         self._dns_thread.start()
         self.dns_worker.start_discovery()
@@ -118,7 +132,7 @@ class MainWindow(QMainWindow):
         
         
         robot_item = RobotItem(name=hostname, profile = profile)
-        self.profile_manager.add_or_update(profile, ROS_StreamWorker())
+        self.profile_manager.add_or_update(profile, self.ros_worker_class())
         
         monitor.bridge_available.connect(lambda host, avail: robot_item.set_available(avail))
         robot_item.connect_robot.connect(self._on_robot_selected)
