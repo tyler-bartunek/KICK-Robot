@@ -36,7 +36,7 @@ from gui._section_bottom import BottomSection
 class MainWindow(QMainWindow):
     
     
-    def __init__(self, parent=None, ros_worker_class=ROS_StreamWorker, dns_worker_class=DNSWorker):
+    def __init__(self, parent=None, ros_worker_class=ROS_StreamWorker, dns_worker_class=DNSWorker, availability_monitor_class=RobotAvailabilityMonitor):
         """
         Initialize the MainWindow.
 
@@ -44,6 +44,7 @@ class MainWindow(QMainWindow):
             parent: The parent widget.
             ros_worker_class: The class to use for the ROS worker.
             dns_worker_class: The class to use for the DNS worker.
+            availability_monitor_class: The class to use for the availability monitor.
         """
         super().__init__()
         
@@ -52,6 +53,7 @@ class MainWindow(QMainWindow):
         # without requiring a live ROS connection or network discovery.
         self.ros_worker_class = ros_worker_class
         self.dns_worker_class = dns_worker_class
+        self.availability_monitor_class = availability_monitor_class
 
         self.setWindowTitle("KICK Robot Desktop")
         self.resize(1280, 720)
@@ -126,7 +128,7 @@ class MainWindow(QMainWindow):
         #Temporary override for ROS, TODO: Find way to specify port
         
         profile = RobotProfile(hostname=hostname, port= 9090, ip_address= ip_address)
-        monitor = RobotAvailabilityMonitor(profile)
+        monitor = self.availability_monitor_class(profile)
         self.monitor_threads[hostname] = QThread()
         monitor.moveToThread(self.monitor_threads[hostname])
         

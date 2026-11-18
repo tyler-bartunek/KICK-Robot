@@ -14,13 +14,14 @@ import sys
 from PyQt6.QtWidgets import QApplication
 from gui import MainWindow
 
-
+from ros_bridge.ROS_Stream import ROS_StreamWorker
+from connection import DNSWorker, AvailabilityMonitor
 
 def main():
     
     #Create the application and main window, then start the event loop
     app = QApplication(sys.argv)
-    window = MainWindow()
+    window = MainWindow(ros_worker_class=ROS_StreamWorker, dns_worker_class=DNSWorker, availability_monitor_class=AvailabilityMonitor)
     window.show()
     sys.exit(app.exec())
     
